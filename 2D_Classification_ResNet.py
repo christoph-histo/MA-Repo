@@ -1,56 +1,39 @@
-import numpy 
 import time
 import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, models, transforms
+from torchvision import models, transforms
 from torch.utils.data import DataLoader
+import Slice_datacreation
 
-data_lung = "/home/histo/Dokumente/christoph/Masterarbeit/Datensätze/Lunge (human)"
-data_skin = "/home/histo/Dokumente/christoph/Masterarbeit/Datensätze/Haut (human)"
-data_gut = "/home/histo/Dokumente/christoph/Masterarbeit/Datensätze/Darm (human)"
+data_path = "/home/histo/Dokumente/christoph/Masterarbeit/Datensätze"
 
-
-# Set the device (GPU if available)
 device = torch.device("cuda:0")
 
-# Load pretrained ResNet (ResNet18 for demonstration, can switch to ResNet50, ResNet101, etc.)
-model = models.resnet18(pretrained=True)
+data_transform = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(224),
+    transforms.ToTensor(),
+    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+])
 
-# Modify the final fully connected layer to classify 3 organ classes (for example)
+dataset = Slice_datacreation.VolumeToSliceDataset(data_path,transform=data_transform)
+
+train_set, val_set, test_set = torch.utils.data.random_split(dataset, [0.8,0.1,0.1])
+
+train_loader = DataLoader(train_set, batch_size=16, shuffle=True)
+val_loader = DataLoader(val_set, batch_size=16, shuffle=False)
+
+dataset_sizes = {'train': len(train_set), 'val': len(val_set)}
+dataloaders = {'train': train_loader, 'val': val_loader}
+
+model = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+
 num_ftrs = model.fc.in_features
-model.fc = nn.Linear(num_ftrs, 3)  # Replace 3 with the actual number of classes
+model.fc = nn.Linear(num_ftrs, 3)  
 
-# Move the model to the available device (GPU/CPU)
 model = model.to(device)
-
-# Data normalization (without augmentation)
-data_transforms = {
-    'train': transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]),
-    'val': transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-    ]),
-}
-
-# Load datasets (assumes directory structure with subfolders for each class)
-data_dir = 'path_to_data'  # Set the correct path to your dataset
-image_datasets = {x: datasets.ImageFolder(root=f'{data_dir}/{x}', transform=data_transforms[x]) for x in ['train', 'val']}
-dataloaders = {x: DataLoader(image_datasets[x], batch_size=32, shuffle=True, num_workers=4) for x in ['train', 'val']}
-
-# Dataset sizes and class names
-dataset_sizes = {x: len(image_datasets[x]) for x in ['train', 'val']}
-class_names = image_datasets['train'].classes  # List of class names
-
-
 
 def train_model(model, criterion, optimizer, num_epochs=25):
     since = time.time()
@@ -59,7 +42,7 @@ def train_model(model, criterion, optimizer, num_epochs=25):
     best_acc = 0.0
 
     for epoch in range(num_epochs):
-        print(f'Epoch {epoch}/{num_epochs - 1}')
+        print(f'Epoch {epoch+1}/{num_epochs}')
         print('-' * 10)
 
         # Each epoch has a training and validation phase
@@ -124,28 +107,3 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 model = train_model(model, criterion, optimizer, num_epochs=25)
 
 torch.save(model.state_dict(), 'resnet_organ_classification_no_aug.pth')
-
-from PIL import Image
-
-def predict_image(image_path, model):
-    # Preprocess the image
-    image = Image.open(image_path)
-    preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-        transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
-    ])
-    image = preprocess(image).unsqueeze(0).to(device)
-
-    # Make prediction
-    model.eval()
-    with torch.no_grad():
-        output = model(image)
-        _, predicted = torch.max(output, 1)
-
-    return class_names[predicted.item()]
-
-# Example prediction
-result = predict_image('path_to_test_image.jpg', model)
-print(f'Predicted class: {result}')
