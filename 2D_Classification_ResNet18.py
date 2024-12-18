@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torchvision import models, transforms
 from torch.utils.data import DataLoader
-import Slice_datacreation
+import Dataloader_slice_parts
 import train
 
 data_path = "/home/histo/Dokumente/christoph/Masterarbeit/Datensätze"
