@@ -35,45 +35,50 @@ class VolumeToSliceDataset(Dataset):
 
                             mask  = np.fromfile(mask_path, dtype= ">u2").reshape(shape//4,order = 'F')
                             
-                            # Append each slice index as a separate sample
-                            for slice_index in range(z_min, z_max):
-                                slice_array = volume[:, :, slice_index]
-                                mask_array = mask[:, :, slice_index // 4]
-                                patches = self.extract_patches(slice_array, mask_array)
+                            # Append each 3D patch as a separate sample
+                            for slice_index in range(z_min, z_max, 32):
+                                volume_patch = volume[:, :, slice_index:slice_index + 32]
+                                mask_patch = mask[:, :, (slice_index // 4):(slice_index // 4) + 8]
+                                patches = self.extract_patches(volume_patch, mask_patch)
                                 for patch in patches:
                                     self.samples.append((patch, class_idx))
 
                             del volume
 
 
-    def extract_patches(self, image, mask, patch_size=(128, 128), threshold=0.1):
-        patch_height, patch_width = patch_size
-        #check if the image is rougly 4 times in each dimension the size of the mask
-        assert image.shape[0] // 4 == mask.shape[0] and image.shape[1] // 4 == mask.shape[1]
+    def extract_patches(self, volume, mask, patch_size=(128, 128, 32), threshold=0.1):
+        patch_height, patch_width, patch_depth = patch_size
+        # Check if the volume is roughly 4 times in each dimension the size of the mask
+        assert volume.shape[0] // 4 == mask.shape[0] and volume.shape[1] // 4 == mask.shape[1] and volume.shape[2] // 4 == mask.shape[2]
 
         patches = []
-        for i in range(0, image.shape[0], patch_height):
-            for j in range(0, image.shape[1], patch_width):
-                # Calculate the patch boundaries
-                start_x = i
-                end_x = min(start_x + patch_height, image.shape[0])
-                start_y = j
-                end_y = min(start_y + patch_width, image.shape[1])
+        for i in range(0, volume.shape[0], patch_height):
+            for j in range(0, volume.shape[1], patch_width):
+                for k in range(0, volume.shape[2], patch_depth):
+                    # Calculate the patch boundaries
+                    start_x = i
+                    end_x = min(start_x + patch_height, volume.shape[0])
+                    start_y = j
+                    end_y = min(start_y + patch_width, volume.shape[1])
+                    start_z = k
+                    end_z = min(start_z + patch_depth, volume.shape[2])
 
-                # Adjust the start position to ensure the patch size is maintained
-                if end_x - start_x < patch_height:
-                    start_x = end_x - patch_height
-                if end_y - start_y < patch_width:
-                    start_y = end_y - patch_width
+                    # Adjust the start position to ensure the patch size is maintained
+                    if end_x - start_x < patch_height:
+                        start_x = end_x - patch_height
+                    if end_y - start_y < patch_width:
+                        start_y = end_y - patch_width
+                    if end_z - start_z < patch_depth:
+                        start_z = end_z - patch_depth
 
-                # Extract the patch from the image and mask
-                image_patch = image[start_y:end_y, start_x:end_x]
-                # Calculate the corresponding region in the mask
-                mask_patch = mask[start_y // 4:end_y // 4, start_x // 4:end_x // 4]
+                    # Extract the patch from the volume and mask
+                    volume_patch = volume[start_y:end_y, start_x:end_x, start_z:end_z]
+                    # Calculate the corresponding region in the mask
+                    mask_patch = mask[start_y // 4:end_y // 4, start_x // 4:end_x // 4, start_z // 4:end_z // 4]
 
-                # Check if the percentage of ones in the mask patch meets the threshold
-                if np.mean(mask_patch) >= threshold:
-                    patches.append(image_patch)
+                    # Check if the percentage of ones in the mask patch meets the threshold
+                    if np.mean(mask_patch) >= threshold:
+                        patches.append(volume_patch)
 
         return patches
 
