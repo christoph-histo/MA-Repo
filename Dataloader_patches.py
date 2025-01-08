@@ -5,6 +5,7 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import json
 from PIL import Image
+import fnmatch
 
 class VolumeToSliceDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False):
@@ -18,7 +19,7 @@ class VolumeToSliceDataset(Dataset):
         # Populate self.samples with (slice_path, label) pairs
         for class_name, class_idx in self.class_to_idx.items():
                     class_dir = os.path.join(root_dir, class_name)
-                    mask_dir = class_dir+"_hier_richtigen_Namen_einfügen"
+                    mask_dir = class_dir+"_tissue_segmentation"
                     print(class_dir)
                     count = 0
                     for volume_file in os.listdir(class_dir):
@@ -27,7 +28,7 @@ class VolumeToSliceDataset(Dataset):
 
                             volume_path = os.path.join(class_dir, volume_file)
 
-                            mask_path = os.path.join(mask_dir, volume_file.replace('.raw', '.png'))
+                            mask_path = self.find_mask_file(mask_dir, volume_file)
 
                             shape, z_min, z_max = self.read_json(volume_path)
                             
@@ -46,7 +47,15 @@ class VolumeToSliceDataset(Dataset):
                             del volume
 
 
-    def extract_patches(self, volume, mask, patch_size=(128, 128, 32), threshold=0.1):
+    def find_mask_file(self, directory, partial_name):
+
+        for root, dirs, files in os.walk(directory):
+            for file in files:
+                if fnmatch.fnmatch(file, f"{partial_name}*"):
+                    return os.path.join(root, file)
+        return None
+    
+    def extract_patches(self, volume, mask, patch_size=(128, 128, 32), threshold=0.01):
         patch_height, patch_width, patch_depth = patch_size
         # Check if the volume is roughly 4 times in each dimension the size of the mask
         assert volume.shape[0] // 4 == mask.shape[0] and volume.shape[1] // 4 == mask.shape[1] and volume.shape[2] // 4 == mask.shape[2]
@@ -81,6 +90,8 @@ class VolumeToSliceDataset(Dataset):
                         patches.append(volume_patch)
 
         return patches
+
+
 
 
 
