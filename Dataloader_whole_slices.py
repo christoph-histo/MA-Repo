@@ -12,6 +12,7 @@ class VolumeToSliceDataset(Dataset):
         self.root_dir = root_dir
         self.transform = transform
         self.samples = []  
+        self.count_samples_per_class = {0:0, 1:0, 2:0}
         if test:
             self.class_to_idx = { 'lung_test': 0, 'skin_test': 1, 'intestine_test': 2 }
         else:
@@ -31,12 +32,16 @@ class VolumeToSliceDataset(Dataset):
                             shape, z_min, z_max = self.read_json(volume_path)
                             
                             volume = np.fromfile(volume_path, dtype= ">u2").reshape(shape,order = 'F')
-
-                            num_slices = shape[2]  # Number of slices along z-axis
                             
                             # Append each slice index as a separate sample
                             for slice_index in range(z_min, z_max):
                                 self.samples.append((volume[:,:,slice_index], class_idx))
+                                self.count_samples_per_class[class_idx] += 1
+
+                            #sanity check
+                            #for slice_index in range(shape[2]):
+                            #    if slice_index < z_min or slice_index > z_max:
+                            #        self.samples.append((volume[:,:,slice_index], class_idx))
 
                             del volume
 
@@ -48,6 +53,10 @@ class VolumeToSliceDataset(Dataset):
         slice_array, label = self.samples[idx]
 
         # Convert the slice to a PIL Image (assuming grayscale)
+
+        if slice_array.dtype != np.uint8:
+            slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
+        
         slice_image = Image.fromarray(slice_array)
         
         # Convert to RGB for compatibility with models expecting 3 channels
@@ -61,8 +70,8 @@ class VolumeToSliceDataset(Dataset):
         label_tensor = torch.tensor(label, dtype=torch.long)
         
         return slice_image, label_tensor
-    
 
+    
     def read_json(self,raw_volume_path):
         print(raw_volume_path)
 

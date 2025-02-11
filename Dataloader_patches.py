@@ -7,11 +7,13 @@ import json
 from PIL import Image
 import fnmatch
 
-class VolumeToSliceDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False):
+class VolumeToPatchesDataset(Dataset):
+    def __init__(self, root_dir, transform=None, test = False, num_channels = 3):
         self.root_dir = root_dir
         self.transform = transform
         self.samples = []  
+        self.count_samples_per_class = {0:0, 1:0, 2:0}
+        self.num_channels = num_channels
         if test:
             self.class_to_idx = { 'lung_test': 0, 'skin_test': 1, 'intestine_test': 2 }
         else:
@@ -28,13 +30,14 @@ class VolumeToSliceDataset(Dataset):
 
                             volume_path = os.path.join(class_dir, volume_file)
 
-                            mask_path = self.find_mask_file(mask_dir, volume_file)
+                            mask_path = self.find_mask_file(mask_dir, volume_file.replace(".raw", ""))
 
                             shape, z_min, z_max = self.read_json(volume_path)
                             
                             volume = np.fromfile(volume_path, dtype= ">u2").reshape(shape,order = 'F')
 
-                            mask  = np.fromfile(mask_path, dtype= ">u2").reshape(shape//4,order = 'F')
+                            mask_shape = (shape[0] // 4, shape[1] // 4, shape[2] // 4)
+                            mask = np.fromfile(mask_path, dtype=">u2").reshape(mask_shape, order='F')
                             
                             # Append each 3D patch as a separate sample
                             for slice_index in range(z_min, z_max, 32):
@@ -43,6 +46,7 @@ class VolumeToSliceDataset(Dataset):
                                 patches = self.extract_patches(volume_patch, mask_patch)
                                 for patch in patches:
                                     self.samples.append((patch, class_idx))
+                                    self.count_samples_per_class[class_idx] += 1
 
                             del volume
 
@@ -52,7 +56,8 @@ class VolumeToSliceDataset(Dataset):
         for root, dirs, files in os.walk(directory):
             for file in files:
                 if fnmatch.fnmatch(file, f"{partial_name}*"):
-                    return os.path.join(root, file)
+                    if file.endswith('segmentation_tissue.raw'):
+                        return os.path.join(root, file)
         return None
     
     def extract_patches(self, volume, mask, patch_size=(128, 128, 32), threshold=0.01):
@@ -92,29 +97,29 @@ class VolumeToSliceDataset(Dataset):
         return patches
 
 
-
-
-
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        slice_array, label = self.samples[idx]
+        patch, label = self.samples[idx]
 
-        # Convert the slice to a PIL Image (assuming grayscale)
-        slice_image = Image.fromarray(slice_array)
-        
-        # Convert to RGB for compatibility with models expecting 3 channels
-        slice_image = slice_image.convert("RGB")
+        patch = patch.astype(np.float32)
 
+        # Convert the 3D patch to a tensor
+        patch_tensor = torch.tensor(patch, dtype=torch.float32)
+
+        if self.num_channels == 3:
+            patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1, 1)
+        elif self.num_channels == 1:
+            patch_tensor = patch_tensor.unsqueeze(0)
         # Apply transformations if specified
         if self.transform:
-            slice_image = self.transform(slice_image)
+            patch_tensor = self.transform(patch_tensor)
         
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)
         
-        return slice_image, label_tensor
+        return patch_tensor, label_tensor
     
 
     def read_json(self,raw_volume_path):
@@ -128,6 +133,7 @@ class VolumeToSliceDataset(Dataset):
         # Extract volume shape from the JSON data
         volume_info = data.get('volume', {})
 
+
         # Get the original shape values
         nx = volume_info.get('nx', 0)  
         ny = volume_info.get('ny', 0)
@@ -137,3 +143,5 @@ class VolumeToSliceDataset(Dataset):
         shape = (nx, ny, nz)
 
         return shape, z_min, z_max
+    
+    

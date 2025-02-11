@@ -3,7 +3,7 @@ import copy
 import torch
 
 
-def train_model(model, criterion, optimizer, num_epochs=25):
+def train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda"):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -30,7 +30,7 @@ def train_model(model, criterion, optimizer, num_epochs=25):
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
-
+                
                 # Forward pass
                 with torch.set_grad_enabled(phase == 'train'):
                     outputs = model(inputs)

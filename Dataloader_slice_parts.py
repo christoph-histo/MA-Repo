@@ -5,12 +5,14 @@ from torch.utils.data import Dataset
 from torchvision import transforms
 import json
 from PIL import Image
+import fnmatch
 
-class VolumeToSliceDataset(Dataset):
+class VolumeToSlicepartsDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False):
         self.root_dir = root_dir
         self.transform = transform
         self.samples = []  
+        self.count_samples_per_class = {0:0, 1:0, 2:0}
         if test:
             self.class_to_idx = { 'lung_test': 0, 'skin_test': 1, 'intestine_test': 2 }
         else:
@@ -27,13 +29,14 @@ class VolumeToSliceDataset(Dataset):
 
                             volume_path = os.path.join(class_dir, volume_file)
 
-                            mask_path = self.find_mask_file(mask_dir, volume_file)
+                            mask_path = self.find_mask_file(mask_dir, volume_file.replace(".raw", ""))
 
                             shape, z_min, z_max = self.read_json(volume_path)
                             
                             volume = np.fromfile(volume_path, dtype= ">u2").reshape(shape,order = 'F')
 
-                            mask  = np.fromfile(mask_path, dtype= ">u2").reshape(shape//4,order = 'F')
+                            mask_shape = (shape[0] // 4, shape[1] // 4, shape[2] // 4)
+                            mask = np.fromfile(mask_path, dtype=">u2").reshape(mask_shape, order='F')
                             
                             # Append each slice index as a separate sample
                             for slice_index in range(z_min, z_max):
@@ -42,23 +45,23 @@ class VolumeToSliceDataset(Dataset):
                                 patches = self.extract_patches(slice_array, mask_array)
                                 for patch in patches:
                                     self.samples.append((patch, class_idx))
-
+                                    self.count_samples_per_class[class_idx] += 1
+                            del slice_array
+                            del patches
                             del volume
 
                     
     def find_mask_file(self, directory, partial_name):
-
         for root, dirs, files in os.walk(directory):
             for file in files:
                 if fnmatch.fnmatch(file, f"{partial_name}*"):
-                    return os.path.join(root, file)
+                    if file.endswith('segmentation_tissue.raw'):
+                        return os.path.join(root, file)
         return None
-    
+
 
     def extract_patches(self, image, mask, patch_size=(128, 128), threshold=0.1):
         patch_height, patch_width = patch_size
-        #check if the image is rougly 4 times in each dimension the size of the mask
-        assert image.shape[0] // 4 == mask.shape[0] and image.shape[1] // 4 == mask.shape[1]
 
         patches = []
         for i in range(0, image.shape[0], patch_height):
@@ -95,6 +98,10 @@ class VolumeToSliceDataset(Dataset):
         slice_array, label = self.samples[idx]
 
         # Convert the slice to a PIL Image (assuming grayscale)
+
+        if slice_array.dtype != np.uint8:
+            slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
+        
         slice_image = Image.fromarray(slice_array)
         
         # Convert to RGB for compatibility with models expecting 3 channels
@@ -111,7 +118,6 @@ class VolumeToSliceDataset(Dataset):
     
 
     def read_json(self,raw_volume_path):
-        print(raw_volume_path)
 
         json_file_name = raw_volume_path.replace('.raw','.json')
         # Load the JSON data from a file
