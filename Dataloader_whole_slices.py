@@ -2,15 +2,15 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
+import torchvision.transforms.v2 as transforms
 import json
 from PIL import Image
 
 class VolumeToSliceDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False):
-
+    def __init__(self, root_dir, transform=None, test = False, augmentation = None):
         self.root_dir = root_dir
         self.transform = transform
+        self.augmentation = augmentation
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         if test:
@@ -47,7 +47,11 @@ class VolumeToSliceDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.samples)
+        if self.augmentation:
+            return len(self.samples) * 2
+        else:
+            return len(self.samples)
+
 
     def __getitem__(self, idx):
         slice_array, label = self.samples[idx]
@@ -65,6 +69,13 @@ class VolumeToSliceDataset(Dataset):
         # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)
+
+        if self.augmentation:
+            if self.augmentation == 'elastic':
+                slice_image = transforms.ElasticTransform(alpha=1, sigma=50)(slice_image)
+            elif self.augmentation == 'tripath':
+                slice_image = transforms.RandomApply()
+
         
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)

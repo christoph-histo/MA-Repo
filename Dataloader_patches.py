@@ -2,15 +2,15 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
 import json
-from PIL import Image
 import fnmatch
+import Data_augmentation_3D as da3d
 
 class VolumeToPatchesDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False, num_channels = 3):
+    def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentaiton = None):
         self.root_dir = root_dir
         self.transform = transform
+        self.augmentaiton = augmentaiton
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         self.num_channels = num_channels

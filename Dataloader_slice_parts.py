@@ -2,15 +2,17 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-from torchvision import transforms
+import torchvision.transforms.v2 as transforms
 import json
 from PIL import Image
 import fnmatch
+import torchio.transforms as tio
 
 class VolumeToSlicepartsDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False):
+    def __init__(self, root_dir, transform=None, test = False, augmentaiton = None):
         self.root_dir = root_dir
         self.transform = transform
+        self.augmentaiton = augmentaiton
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         if test:
@@ -92,24 +94,38 @@ class VolumeToSlicepartsDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.samples)
+        if self.augmentaiton:
+            return len(self.samples)*2
+        else:
+            return len(self.samples)
+
 
     def __getitem__(self, idx):
-        slice_array, label = self.samples[idx]
-
-        # Convert the slice to a PIL Image (assuming grayscale)
+        if len(self.samples) < idx:
+            slice_array, label = self.samples[idx]
+        else:
+            slice_array, label = self.samples[idx % len(self.samples)]
+            aug = True
 
         if slice_array.dtype != np.uint8:
             slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
         
         slice_image = Image.fromarray(slice_array)
         
-        # Convert to RGB for compatibility with models expecting 3 channels
         slice_image = slice_image.convert("RGB")
 
         # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)
+        
+        if aug:
+            if self.augmentaiton == 'elastic':
+                slice_image = tio.RandomElasticDeformation(num_control_points=(9))(slice_image)
+            elif self.augmentaiton == 'tripath':
+                slice_image = transforms.RandomChoice([transforms.RandomRotation(degrees=(-180,180)),])(slice_image)
+            else:
+                print("Error: Augmentation not supported")
+                return
         
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)
@@ -118,6 +134,7 @@ class VolumeToSlicepartsDataset(Dataset):
     
 
     def read_json(self,raw_volume_path):
+        print(raw_volume_path)
 
         json_file_name = raw_volume_path.replace('.raw','.json')
         # Load the JSON data from a file
