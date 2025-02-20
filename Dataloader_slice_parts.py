@@ -2,17 +2,17 @@ import os
 import numpy as np
 import torch
 from torch.utils.data import Dataset
-import torchvision.transforms.v2 as transforms
+import torchvision.transforms as transform
 import json
 from PIL import Image
 import fnmatch
 import torchio.transforms as tio
 
 class VolumeToSlicepartsDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False, augmentaiton = None):
+    def __init__(self, root_dir, transform=None, test = False, augmentation = None):
         self.root_dir = root_dir
         self.transform = transform
-        self.augmentaiton = augmentaiton
+        self.augmentation = augmentation
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         if test:
@@ -94,38 +94,57 @@ class VolumeToSlicepartsDataset(Dataset):
 
 
     def __len__(self):
-        if self.augmentaiton:
+        if self.augmentation:
             return len(self.samples)*2
         else:
             return len(self.samples)
 
 
     def __getitem__(self, idx):
-        if len(self.samples) < idx:
+
+        aug = False
+        if len(self.samples) > idx:
             slice_array, label = self.samples[idx]
         else:
             slice_array, label = self.samples[idx % len(self.samples)]
             aug = True
+
 
         if slice_array.dtype != np.uint8:
             slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
         
         slice_image = Image.fromarray(slice_array)
         
+        # Convert to RGB for compatibility with models expecting 3 channels
         slice_image = slice_image.convert("RGB")
+        
+        # Convert the PIL image to a tensor
+        slice_image = transform.PILToTensor()(slice_image)
+        # Normalize the slice_array
+        slice_image = (slice_image - slice_image.min()) / (slice_image.max() - slice_image.min())
+        # Add one more dimension to the slice_image tensor
+        
 
         # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)
         
         if aug:
-            if self.augmentaiton == 'elastic':
-                slice_image = tio.RandomElasticDeformation(num_control_points=(9))(slice_image)
-            elif self.augmentaiton == 'tripath':
-                slice_image = transforms.RandomChoice([transforms.RandomRotation(degrees=(-180,180)),])(slice_image)
+            if self.augmentation == 'elastic':
+                slice_image = slice_image.unsqueeze(0)
+                slice_image = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(0,7.5,7.5))(slice_image)
+                slice_image = slice_image.squeeze(0)
+            elif self.augmentation == 'tripath':
+                transforms = {
+                    tio.RandomFlip(axes=1) : 0.33, 
+                    tio.RandomFlip(axes=2) : 0.33, 
+                    tio.Gamma(gamma=(0.8,1.2)) : 0.33
+                }
+                slice_image = tio.OneOf(transforms)(slice_image)
             else:
                 print("Error: Augmentation not supported")
                 return
+   
         
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)

@@ -1,8 +1,9 @@
 import os
 import numpy as np
 import torch
+import torchvision.transforms as transform
 from torch.utils.data import Dataset
-import torchvision.transforms.v2 as transforms
+import torchio.transforms as tio
 import json
 from PIL import Image
 
@@ -54,7 +55,13 @@ class VolumeToSliceDataset(Dataset):
 
 
     def __getitem__(self, idx):
-        slice_array, label = self.samples[idx]
+
+        aug = False
+        if len(self.samples) > idx:
+            slice_array, label = self.samples[idx]
+        else:
+            slice_array, label = self.samples[idx % len(self.samples)]
+            aug = True
 
         # Convert the slice to a PIL Image (assuming grayscale)
 
@@ -66,15 +73,29 @@ class VolumeToSliceDataset(Dataset):
         # Convert to RGB for compatibility with models expecting 3 channels
         slice_image = slice_image.convert("RGB")
 
+        slice_image = transform.PILToTensor()(slice_image)
+        # Normalize the slice_array
+        slice_array = (slice_array - slice_array.min()) / (slice_array.max() - slice_array.min())
+
         # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)
 
-        if self.augmentation:
+        if aug:
             if self.augmentation == 'elastic':
-                slice_image = transforms.ElasticTransform(alpha=1, sigma=50)(slice_image)
-            elif self.augmentation == 'tripath':
-                slice_image = transforms.RandomApply()
+                slice_image = slice_image.unsqueeze(0)
+                slice_image = tio.RandomElasticDeformation(num_control_points=(30,30,5),locked_borders=2,max_displacement=(0,30,30))(slice_image)
+                slice_image = slice_image.squeeze(0)
+            elif self.augmentaiton == 'tripath':
+                transforms = {
+                    tio.RandomFlip(axes=1) : 0.33, 
+                    tio.RandomFlip(axes=2) : 0.33, 
+                    tio.Gamma(gamma=(0.8,1.2)) : 0.33
+                }
+                slice_image = tio.OneOf(transforms)(slice_image)
+            else:
+                print("Error: Augmentation not supported")
+                return
 
         
         # Convert the label to a tensor

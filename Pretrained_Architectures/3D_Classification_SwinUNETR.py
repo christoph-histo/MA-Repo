@@ -9,7 +9,7 @@ import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
 sys.path.append('/home/christoph/Dokumente/christoph-MA/research-contributions/SwinUNETR')
 import Dataloader_patches
-import SwinUNETR
+import monai.networks.nets.SwinUNETR as SwinUNETR
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
@@ -50,7 +50,7 @@ def train():
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches(data_path, transform=None,num_channels=1)
+    dataset = Dataloader_patches(data_path, transform=None,num_channels=1,test=True)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -95,4 +95,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-eval()
+train()

@@ -4,13 +4,13 @@ import torch
 from torch.utils.data import Dataset
 import json
 import fnmatch
-import Data_augmentation_3D as da3d
+import torchio.transforms as tio    
 
 class VolumeToPatchesDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentaiton = None):
+    def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentation = None):
         self.root_dir = root_dir
         self.transform = transform
-        self.augmentaiton = augmentaiton
+        self.augmentation = augmentation
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         self.num_channels = num_channels
@@ -98,24 +98,50 @@ class VolumeToPatchesDataset(Dataset):
 
 
     def __len__(self):
-        return len(self.samples)
+        if self.augmentation:
+            return len(self.samples)*2
+        else:
+            return len(self.samples)
+    
 
     def __getitem__(self, idx):
-        patch, label = self.samples[idx]
+
+        aug = False
+        if len(self.samples) > idx:
+            patch, label = self.samples[idx]
+        else:
+            patch, label = self.samples[idx % len(self.samples)]
+            aug = True
 
         patch = patch.astype(np.float32)
 
         # Convert the 3D patch to a tensor
         patch_tensor = torch.tensor(patch, dtype=torch.float32)
 
+        patch_tensor = (patch_tensor - patch_tensor.min()) / (patch_tensor.max() - patch_tensor.min())
+
         if self.num_channels == 3:
             patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1, 1)
         elif self.num_channels == 1:
-            patch_tensor = patch_tensor.unsqueeze(0)
-        # Apply transformations if specified
+            patch_tensor = patch_tensor
+
         if self.transform:
             patch_tensor = self.transform(patch_tensor)
-        
+
+        if aug:
+            if self.augmentation == 'elastic':
+                patch_tensor = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(3,7.5,7.5))(patch_tensor)
+            elif self.augmentation == 'tripath':
+                transforms = {
+                    tio.RandomFlip(axes=0) : 0.25, 
+                    tio.RandomFlip(axes=1) : 0.25, 
+                    tio.RandomFlip(axes=2) : 0.25, 
+                    tio.Gamma(gamma=(0.8,1.2)) : 0.25
+                }
+                patch_tensor = tio.OneOf(transforms)(patch_tensor)
+            else:
+                print("Error: Augmentation not supported")
+                return
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)
         
