@@ -5,15 +5,17 @@ from torch.utils.data import Dataset
 import json
 import fnmatch
 import torchio.transforms as tio    
+import Rotation_transform
 
 class VolumeToPatchesDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentation = None):
+    def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentation = None,SwinUnetr = False):
         self.root_dir = root_dir
         self.transform = transform
         self.augmentation = augmentation
         self.samples = []  
         self.count_samples_per_class = {0:0, 1:0, 2:0}
         self.num_channels = num_channels
+        self.SwinUnetr = SwinUnetr
         if test:
             self.class_to_idx = { 'lung_test': 0, 'skin_test': 1, 'intestine_test': 2 }
         else:
@@ -103,9 +105,10 @@ class VolumeToPatchesDataset(Dataset):
         else:
             return len(self.samples)
     
-
+    def rotate_function(self,tensor):
+        return Rotation_transform.RandomRotate3D()(tensor)
+    
     def __getitem__(self, idx):
-
         aug = False
         if len(self.samples) > idx:
             patch, label = self.samples[idx]
@@ -119,29 +122,35 @@ class VolumeToPatchesDataset(Dataset):
         patch_tensor = torch.tensor(patch, dtype=torch.float32)
 
         patch_tensor = (patch_tensor - patch_tensor.min()) / (patch_tensor.max() - patch_tensor.min())
-
-        if self.num_channels == 3:
-            patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1, 1)
-        elif self.num_channels == 1:
-            patch_tensor = patch_tensor
-
+        
         if self.transform:
             patch_tensor = self.transform(patch_tensor)
 
         if aug:
             if self.augmentation == 'elastic':
-                patch_tensor = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(3,7.5,7.5))(patch_tensor)
+                patch_tensor = patch_tensor.unsqueeze(0)
+                patch_tensor = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(10,10,2))(patch_tensor)
+                patch_tensor = patch_tensor.squeeze(0)
             elif self.augmentation == 'tripath':
                 transforms = {
-                    tio.RandomFlip(axes=0) : 0.25, 
-                    tio.RandomFlip(axes=1) : 0.25, 
-                    tio.RandomFlip(axes=2) : 0.25, 
-                    tio.Gamma(gamma=(0.8,1.2)) : 0.25
+                    tio.Lambda(self.rotate_function) : 2/3,
+                    tio.Gamma(gamma=(0.8,1.2)) : 1/3
                 }
+                patch_tensor = patch_tensor.unsqueeze(0)
                 patch_tensor = tio.OneOf(transforms)(patch_tensor)
+                patch_tensor = patch_tensor.squeeze(0)
             else:
                 print("Error: Augmentation not supported")
                 return
+            
+        if self.num_channels == 3:
+            patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1, 1)
+        elif self.num_channels == 1:
+            if self.SwinUnetr:
+                patch_tensor = patch_tensor.unsqueeze(0)
+            else:    
+                patch_tensor = patch_tensor
+
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)
         

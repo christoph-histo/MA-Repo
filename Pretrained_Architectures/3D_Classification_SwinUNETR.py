@@ -9,7 +9,7 @@ import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
 sys.path.append('/home/christoph/Dokumente/christoph-MA/research-contributions/SwinUNETR')
 import Dataloader_patches
-import monai.networks.nets.SwinUNETR as SwinUNETR
+import SwinUNETR
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
@@ -32,10 +32,10 @@ if 'state_dict' in state_dict:
 device = torch.device("cuda:0")
 
 
-model = SwinUNETR.swin_unetr_base(input_size=(128,128,32))
+model = SwinUNETR.swin_unetr_base(input_size=(128,128,32),trainable_layers=['all'],in_channels=1,spatial_dims=3)    
 
 
-missing_keys, unexpected_keys = model.load_state_dict(state_dict=state_dict, strict=False)
+model.load_state_dict(state_dict=state_dict, strict=False)
 
 
 model.swinViT.layers4[0].downsample.reduction = nn.Linear(3072,3)
@@ -45,12 +45,13 @@ model.swinViT.layers4[0].downsample.norm= nn.Identity(3,3)
 batch_size = 16
 
 
-def train():
+def train(model):
+
     model = nn.DataParallel(model)
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches(data_path, transform=None,num_channels=1,test=True)
+    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=1,test=False,SwinUnetr = True)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -66,7 +67,7 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), 'swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth')
 
 def eval():
 
@@ -95,4 +96,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-train()
+train(model)

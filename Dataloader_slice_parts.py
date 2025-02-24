@@ -7,6 +7,7 @@ import json
 from PIL import Image
 import fnmatch
 import torchio.transforms as tio
+import Rotation_transform
 
 class VolumeToSlicepartsDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False, augmentation = None):
@@ -132,15 +133,16 @@ class VolumeToSlicepartsDataset(Dataset):
         if aug:
             if self.augmentation == 'elastic':
                 slice_image = slice_image.unsqueeze(0)
-                slice_image = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(0,7.5,7.5))(slice_image)
+                slice_image = tio.RandomElasticDeformation(num_control_points=(5,9,9),max_displacement=(0,10,10))(slice_image)
                 slice_image = slice_image.squeeze(0)
             elif self.augmentation == 'tripath':
                 transforms = {
-                    tio.RandomFlip(axes=1) : 0.33, 
-                    tio.RandomFlip(axes=2) : 0.33, 
-                    tio.Gamma(gamma=(0.8,1.2)) : 0.33
+                    Rotation_transform.RandomRotate2D() : 2/3,
+                    tio.Gamma(gamma=(0.8,1.2)) : 1/3
                 }
+                slice_image = slice_image.unsqueeze(0)
                 slice_image = tio.OneOf(transforms)(slice_image)
+                slice_image = slice_image.squeeze(0)
             else:
                 print("Error: Augmentation not supported")
                 return

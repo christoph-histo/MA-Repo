@@ -6,6 +6,7 @@ from torch.utils.data import Dataset
 import torchio.transforms as tio
 import json
 from PIL import Image
+import  Rotation_transform
 
 class VolumeToSliceDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False, augmentation = None):
@@ -84,15 +85,16 @@ class VolumeToSliceDataset(Dataset):
         if aug:
             if self.augmentation == 'elastic':
                 slice_image = slice_image.unsqueeze(0)
-                slice_image = tio.RandomElasticDeformation(num_control_points=(30,30,5),locked_borders=2,max_displacement=(0,30,30))(slice_image)
+                slice_image = tio.RandomElasticDeformation(num_control_points=(5,30,30),locked_borders=2,max_displacement=(0,30,30))(slice_image)
                 slice_image = slice_image.squeeze(0)
             elif self.augmentaiton == 'tripath':
                 transforms = {
-                    tio.RandomFlip(axes=1) : 0.33, 
-                    tio.RandomFlip(axes=2) : 0.33, 
-                    tio.Gamma(gamma=(0.8,1.2)) : 0.33
+                    Rotation_transform.RandomRotate2D() : 2/3, 
+                    tio.Gamma(gamma=(0.8,1.2)) : 1/3
                 }
+                slice_image = slice_image.unsqueeze(0)
                 slice_image = tio.OneOf(transforms)(slice_image)
+                slice_image = slice_image.squeeze(0)
             else:
                 print("Error: Augmentation not supported")
                 return
