@@ -63,7 +63,7 @@ def train(model):
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.AdamW(params=model.parameters(),lr=0.0005,weight_decay=0.0005)
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 

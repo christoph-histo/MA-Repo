@@ -51,9 +51,9 @@ class RandomRotate3D(object):
 
 class RandomRotate2D(object):
     def __call__(self, patch):
+
         k = random.randint(1, 3)
 
-        # Rotate around z-axis in the (H, W) plane => dims=(1, 2)
-        patch = torch.rot90(patch, k=k, dims=(1, 2))
+        patch = torch.rot90(patch, k=k, dims=(2, 3))
 
         return patch

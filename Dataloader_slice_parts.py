@@ -101,6 +101,9 @@ class VolumeToSlicepartsDataset(Dataset):
             return len(self.samples)
 
 
+    def rotate_function(self,tensor):
+        return Rotation_transform.RandomRotate2D()(tensor)
+    
     def __getitem__(self, idx):
 
         aug = False
@@ -137,7 +140,7 @@ class VolumeToSlicepartsDataset(Dataset):
                 slice_image = slice_image.squeeze(0)
             elif self.augmentation == 'tripath':
                 transforms = {
-                    Rotation_transform.RandomRotate2D() : 2/3,
+                    tio.Lambda(self.rotate_function) : 2/3,
                     tio.Gamma(gamma=(0.8,1.2)) : 1/3
                 }
                 slice_image = slice_image.unsqueeze(0)

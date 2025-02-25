@@ -54,7 +54,9 @@ class VolumeToSliceDataset(Dataset):
         else:
             return len(self.samples)
 
-
+    def rotate_function(self,tensor):
+        return Rotation_transform.RandomRotate2D()(tensor)
+    
     def __getitem__(self, idx):
 
         aug = False
@@ -87,9 +89,9 @@ class VolumeToSliceDataset(Dataset):
                 slice_image = slice_image.unsqueeze(0)
                 slice_image = tio.RandomElasticDeformation(num_control_points=(5,30,30),locked_borders=2,max_displacement=(0,30,30))(slice_image)
                 slice_image = slice_image.squeeze(0)
-            elif self.augmentaiton == 'tripath':
+            elif self.augmentation == 'tripath':
                 transforms = {
-                    Rotation_transform.RandomRotate2D() : 2/3, 
+                    tio.Lambda(self.rotate_function) : 2/3,
                     tio.Gamma(gamma=(0.8,1.2)) : 1/3
                 }
                 slice_image = slice_image.unsqueeze(0)
@@ -98,7 +100,6 @@ class VolumeToSliceDataset(Dataset):
             else:
                 print("Error: Augmentation not supported")
                 return
-
         
         # Convert the label to a tensor
         label_tensor = torch.tensor(label, dtype=torch.long)
