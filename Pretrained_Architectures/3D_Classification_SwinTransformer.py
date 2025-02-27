@@ -21,14 +21,21 @@ model = video.swin3d_b(video.Swin3D_B_Weights.KINETICS400_V1)
 num_ftrs = model.head.in_features
 model.head = nn.Linear(num_ftrs, 3)  
 
+for param in model.parameters():
+    param.requires_grad = False
+
+model.head.requires_grad_ = True
+
 batch_size = 32
 
 def train():
+    global model
+
     model = nn.DataParallel(model)
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches(data_path, transform=None)
+    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=3, test=False)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -44,11 +51,13 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_no_aug_only_last_layer.pth')
 
 def eval():
 
-    model_path = 'swin_transformer_3D_organ_classification_patches_no_aug.pth'
+    global model
+
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -73,4 +82,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-eval()
+train()

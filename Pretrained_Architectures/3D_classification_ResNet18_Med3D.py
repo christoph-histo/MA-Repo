@@ -23,6 +23,10 @@ data_path = "/storage/Datensätze"
 
 model = resnet.resnet18(sample_input_D=32, sample_input_H=128, sample_input_W=128, num_seg_classes=1)
 
+model_path = "/home/christoph/Dokumente/christoph-MA/MedicalNet/pretrain/resnet_18_23dataset.pth"
+
+model.load_state_dict(torch.load(model_path),strict=False)
+
 model = nn.DataParallel(model)
 
 model.module.conv_seg = Sequential(
@@ -34,11 +38,13 @@ model.module.conv_seg = Sequential(
 batch_size = 32
 
 def train():
+    global model
+
     model = nn.DataParallel(model)
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches(data_path, transform=None,num_channels=1)
+    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=3)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -54,7 +60,7 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), 'resnet_Med3D_organ_classification_patches_no_aug.pth')
 
 def eval():
 
@@ -75,4 +81,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-eval()
+train()

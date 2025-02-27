@@ -54,11 +54,13 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), 'swin_transformer_2D_organ_classification_slice_parts_no_aug.pth')
 
 def eval():
 
-    model_path = 'swin_transformer_2D_organ_classification_slice_parts_no_aug.pth'
+    global model
+    
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_2D_organ_classification_slice_parts_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -83,4 +85,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-train()
+eval()

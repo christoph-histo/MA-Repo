@@ -46,11 +46,11 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_no_aug.pth')
 
 def eval():
 
-    model_path = 'resnet_3D_organ_classificatio_slide_parts_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present

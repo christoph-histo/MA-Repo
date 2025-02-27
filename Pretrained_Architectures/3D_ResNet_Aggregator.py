@@ -3,54 +3,47 @@ import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torchvision import transforms
 from torchvision.models import video
 from torch.utils.data import DataLoader
 import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
-sys.path.append('/home/christoph/Dokumente/christoph-MA/research-contributions/SwinUNETR')
+import Aggregator_Module
 import Dataloader_patches
-import SwinUNETR
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
 
-
 data_path = "/storage/Datensätze"
 
+device = torch.device("cuda")
 
-model_path = "/home/christoph/Dokumente/christoph-MA//research-contributions/model_swinvit.pt"
+model = video.r3d_18(weights=video.R3D_18_Weights.KINETICS400_V1)
 
+num_ftrs = model.fc.in_features
 
-state_dict = torch.load(model_path)
+model.fc = nn.Linear(num_ftrs, 128)
 
+# Freeze all layers except the last fully connected layer
+for param in model.parameters():
+    param.requires_grad = False
 
-if 'state_dict' in state_dict:
-    state_dict = state_dict['state_dict']
+model.fc.weight.requires_grad = True
 
+aggregator_model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=0.5, out_dim=3,encoder=model,encoder_dim=128)
 
-device = torch.device("cuda:0")
+aggregator_model.start_attention(freeze_encoder=False)
 
+batch_size = 32
 
-model = SwinUNETR.swin_unetr_base(input_size=(128,128,32),trainable_layers=['all'],in_channels=1,spatial_dims=3)    
-
-
-model.load_state_dict(state_dict=state_dict, strict=False)
-
-
-model.swinViT.layers4[0].downsample.reduction = nn.Linear(3072,3)
-model.swinViT.layers4[0].downsample.norm= nn.Identity(3,3)
-
-
-batch_size = 16
-
-
-def train(model):
+def train():
+    global model
 
     model = nn.DataParallel(model)
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=1,test=False,SwinUnetr = True)
+    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=3, test=True)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -62,15 +55,17 @@ def train(model):
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.AdamW(params=model.parameters(),lr=0.0005,weight_decay=0.0005)
+    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_elasic_aug.pth')
 
 def eval():
+    
+    global model
 
-    model_path = 'swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_elasic_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -84,7 +79,7 @@ def eval():
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,test=True,num_channels=1)
+    test_dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,test=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device) 
@@ -95,4 +90,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-train(model)
+eval()
