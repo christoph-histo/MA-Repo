@@ -1,15 +1,14 @@
-import time
-import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision import transforms
 from torchvision.models import video
 from torch.utils.data import DataLoader
 import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
 import Aggregator_Module
-import Dataloader_patches
+import Dataloader_patches_aggregator
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
@@ -18,32 +17,33 @@ data_path = "/storage/Datensätze"
 
 device = torch.device("cuda")
 
-model = video.r3d_18(weights=video.R3D_18_Weights.KINETICS400_V1)
+encoder = video.r3d_18(weights=video.R3D_18_Weights.KINETICS400_V1)
 
-num_ftrs = model.fc.in_features
+num_ftrs = encoder.fc.out_features
 
-model.fc = nn.Linear(num_ftrs, 128)
+dropout = 0.5
 
-# Freeze all layers except the last fully connected layer
-for param in model.parameters():
-    param.requires_grad = False
+decoder_enc = nn.Sequential(
+                            nn.Linear(num_ftrs, 128),
+                            nn.GELU(),
+                            nn.Dropout(dropout)
+                            )
 
-model.fc.weight.requires_grad = True
+model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=dropout, out_dim=3,encoder=decoder_enc,encoder_dim=128)
 
-aggregator_model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=0.5, out_dim=3,encoder=model,encoder_dim=128)
+model.start_attention(freeze_encoder=False)
 
-aggregator_model.start_attention(freeze_encoder=False)
-
-batch_size = 32
+batch_size = 1
 
 def train():
-    global model
+
+    global model, encoder
 
     model = nn.DataParallel(model)
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,num_channels=3, test=True)
+    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None,num_channels=3, test=False,encoder=encoder)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -55,17 +55,19 @@ def train():
 
     criterion = nn.CrossEntropyLoss()
 
-    optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0002, weight_decay=0.0005)
 
-    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
+    scheduler = CosineAnnealingLR(optimizer, T_max=25, eta_min=0)
 
-    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_elasic_aug.pth')
+    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda",aggregation=True, scheduler=scheduler)
+
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth')
 
 def eval():
     
     global model
 
-    model_path = '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_elasic_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -90,4 +92,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-eval()
+train()

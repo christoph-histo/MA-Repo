@@ -3,7 +3,7 @@ import copy
 import torch
 
 
-def train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda"):
+def train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda", aggregation=False, scheduler=None):
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
@@ -55,7 +55,9 @@ def train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epo
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-
+                
+        if scheduler is not None:
+            scheduler.step()
         print()
 
     time_elapsed = time.time() - since

@@ -90,29 +90,14 @@ class AttnMeanPoolMIL(nn.Module):
         x_enc = self.encoder(x)
         return x_enc
 
-    def forward(self, x, coords):
-        """
-        Args:
-        - x (n_batches x n_instances x feature_dim): input instance features
-        - coords (list of tuples): coordinates. Not really used for this vanilla version
-
-        Returns:
-        - out (n_batches x encode_dim): Aggregated features
-        - attn_dict (dict): Dictionary of attention scores
-        """
-        n_batches, n_instances, _ = x.shape
-        attn_dict = {'inter': [], 'intra': []}
-
+    def forward(self, x):
+        
         x_enc = self.encoder(x)
-        attn, out = self.attend(x_enc)  # (n_batches * n_instances, 1), (n_batches, encode_dim)
+        attn, out = self.attend(x_enc)  
 
         out = self.head(out)
 
-        attn_dict['intra'] = attn.detach()
-        levels = torch.unique(coords[:, 0])
-        attn_dict['inter'] = torch.ones(n_batches, len(levels), 1)    # All slices receive same attn
-
-        return out, attn_dict
+        return out
 
     def captum(self, x):
         """
