@@ -17,11 +17,11 @@ data_path = "/storage/Datensätze"
 
 device = torch.device("cuda")
 
-encoder = video.r3d_18(weights=video.R3D_18_Weights.KINETICS400_V1)
+encoder = video.swin3d_b(video.Swin3D_B_Weights.KINETICS400_V1)
+
+num_ftrs = encoder.head.out_features
 
 encoder.to(device)
-
-num_ftrs = encoder.fc.out_features
 
 dropout = 0.25
 
@@ -65,13 +65,13 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=epochs, device="cuda",aggregation=True, scheduler=scheduler)
 
-    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_no_aug.pth')
 
 def eval():
     
     global model
 
-    model_path = '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present

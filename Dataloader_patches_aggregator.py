@@ -18,9 +18,7 @@ class VolumeToFeaturesDataset(Dataset):
         self.samples_tree = {}
 
         self.label_per_volume = {}
-        
-        self.t = {}
-    
+
         self.encoder = encoder
         self.num_channels = num_channels
         self.SwinUnetr = SwinUnetr
@@ -36,7 +34,8 @@ class VolumeToFeaturesDataset(Dataset):
             class_dir = os.path.join(root_dir, class_name)
             mask_dir = class_dir + "_tissue_segmentation"
 
-            print("Processing directory:", class_dir)
+            print(class_dir)
+            
             if not os.path.isdir(class_dir):
                 print(f"[WARNING] {class_dir} does not exist, skipping.")
                 continue
@@ -119,6 +118,7 @@ class VolumeToFeaturesDataset(Dataset):
 
         return patches
 
+    
 
     def __len__(self):
         if not self.max_idx_per_volume:
@@ -136,9 +136,12 @@ class VolumeToFeaturesDataset(Dataset):
     
     def create_feats(self, tensor):
         with torch.no_grad():
+            tensor = tensor.to('cuda')
             feature = self.encoder(tensor.unsqueeze(0))
         return feature.squeeze(0)
     
+    
+
     def __getitem__(self, idx):
 
         max_raw_idx = max(self.max_idx_per_volume.values()) if self.max_idx_per_volume else 0
@@ -238,7 +241,7 @@ class VolumeToFeaturesDataset(Dataset):
 
         label_tensor = torch.tensor(label_for_volume, dtype=torch.long)
 
-        return aggregator_input, label_tensor
+        return aggregator_input, label_tensor, chosen_patches
 
     
 

@@ -66,11 +66,11 @@ def train(model):
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth')
 
 def eval():
 
-    model_path = 'swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/swinUNETR_3D_BTCV_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -84,7 +84,7 @@ def eval():
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,test=True,num_channels=1)
+    test_dataset = Dataloader_patches.VolumeToPatchesDataset(data_path, transform=None,test=True,num_channels=1,SwinUnetr = True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device) 
@@ -95,4 +95,5 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-train(model)
+eval()
+#train(model)

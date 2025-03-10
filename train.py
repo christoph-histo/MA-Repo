@@ -55,9 +55,13 @@ def train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epo
             if phase == 'val' and epoch_acc > best_acc:
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
-                
+
         if scheduler is not None:
             scheduler.step()
+
+        if aggregation:
+            dataloaders['train'].dataset.dataset.shuffle_samples()
+
         print()
 
     time_elapsed = time.time() - since
