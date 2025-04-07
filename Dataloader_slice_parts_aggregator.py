@@ -8,9 +8,11 @@ from PIL import Image
 import fnmatch
 import torchio.transforms as tio
 import Rotation_transform
+import random
+import elasticdeform
 
 class VolumeToSlicepartsDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test = False, augmentation = None,encoder = None):
+    def __init__(self, root_dir, transform=None, test = False, augmentation = None,encoder = None, num_feats = 320):
         self.root_dir = root_dir
         self.transform = transform
         self.augmentation = augmentation
@@ -23,12 +25,16 @@ class VolumeToSlicepartsDataset(Dataset):
         self.encoder = encoder
 
         self.samples = []  
+
+        self.num_feats = num_feats  
         if test:
             self.class_to_idx = { 'lung_test': 0, 'skin_test': 1, 'intestine_test': 2 }
         else:
             self.class_to_idx = { 'lung': 0, 'skin': 1, 'intestine': 2 }
-        # Populate self.samples with (slice_path, label) pairs
+
+
         cumulative_idx = 0
+
 
         for class_name, class_idx in self.class_to_idx.items():
                     class_dir = os.path.join(root_dir, class_name)
@@ -54,17 +60,30 @@ class VolumeToSlicepartsDataset(Dataset):
                             mask = np.fromfile(mask_path, dtype=">u2").reshape(mask_shape, order='F')
                             
                             self.samples_tree[volume_file] = []
-                            
+
                             # Append each slice index as a separate sample
                             for slice_index in range(z_min, z_max):
-                                slice_array = volume[:, :, slice_index]
-                                mask_array = mask[:, :, slice_index // 4]
-                                patches = self.extract_patches(slice_array, mask_array)
-                                for patch in patches:
-                                    self.samples.append((patch, class_idx))
 
-                            del slice_array
-                            del patches
+                                slice_array = volume[:, :, slice_index]
+
+                                mask_array = mask[:, :, slice_index // 4]
+
+                                patches = self.extract_patches(slice_array, mask_array)
+
+                                self.samples_tree[volume_file].extend(patches)
+
+                            random.shuffle(self.samples_tree[volume_file])
+
+                            self.label_per_volume[volume_file] = class_idx
+
+                            num_patches = len(self.samples_tree[volume_file])
+
+                            num_units = int(np.ceil(num_patches / num_feats))
+
+                            cumulative_idx += num_units
+
+                            self.max_idx_per_volume[volume_file] = cumulative_idx
+
                             del volume
 
                     
@@ -76,6 +95,9 @@ class VolumeToSlicepartsDataset(Dataset):
                         return os.path.join(root, file)
         return None
 
+    def shuffle_samples(self):
+        for volume_file in self.samples_tree:
+            random.shuffle(self.samples_tree[volume_file])
 
     def extract_patches(self, image, mask, patch_size=(128, 128), threshold=0.1):
         patch_height, patch_width = patch_size
@@ -109,66 +131,116 @@ class VolumeToSlicepartsDataset(Dataset):
 
 
     def __len__(self):
+        if not self.max_idx_per_volume:
+            return 0
+        
+        max_idx = max(self.max_idx_per_volume.values())
+        
         if self.augmentation:
-            return len(self.samples)*2
+            return 2 * max_idx
         else:
-            return len(self.samples)
+            return max_idx
 
 
     def rotate_function(self,tensor):
         return Rotation_transform.RandomRotate2D()(tensor)
     
+    def create_feats(self, tensor):
+        with torch.no_grad():
+            tensor = tensor.to('cuda')
+            feature = self.encoder(tensor.unsqueeze(0))
+        return feature.squeeze(0)
+    
+
     def __getitem__(self, idx):
 
-        aug = False
-        if len(self.samples) > idx:
-            slice_array, label = self.samples[idx]
-        else:
-            slice_array, label = self.samples[idx % len(self.samples)]
-            aug = True
+        max_raw_idx = max(self.max_idx_per_volume.values()) if self.max_idx_per_volume else 0
 
+        if idx >= max_raw_idx:
+            idx = idx % max_raw_idx
 
-        if slice_array.dtype != np.uint8:
-            slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
-        
-        slice_image = Image.fromarray(slice_array)
-        
-        # Convert to RGB for compatibility with models expecting 3 channels
-        slice_image = slice_image.convert("RGB")
-        
-        # Convert the PIL image to a tensor
-        slice_image = transform.PILToTensor()(slice_image)
-        # Normalize the slice_array
-        slice_image = (slice_image - slice_image.min()) / (slice_image.max() - slice_image.min())
-        # Add one more dimension to the slice_image tensor
-        
+        volume_maxes = sorted(self.max_idx_per_volume.items(), key=lambda x: x[1])
 
-        # Apply transformations if specified
-        if self.transform:
-            slice_image = self.transform(slice_image)
-        
-        if aug:
-            if self.augmentation == 'elastic':
-                slice_image = slice_image.unsqueeze(0)
-                slice_image = tio.RandomElasticDeformation(num_control_points=(5,9,9),max_displacement=(0,10,10))(slice_image)
-                slice_image = slice_image.squeeze(0)
-            elif self.augmentation == 'tripath':
-                transforms = {
-                    tio.Lambda(self.rotate_function) : 2/3,
-                    tio.Gamma(gamma=(0.8,1.2)) : 1/3
-                }
-                slice_image = slice_image.unsqueeze(0)
-                slice_image = tio.OneOf(transforms)(slice_image)
-                slice_image = slice_image.squeeze(0)
+        prev_cumulative = 0
+        chosen_volume = None
+
+        for vol_file, cum_val in volume_maxes:
+            if idx < cum_val:
+                chosen_volume = vol_file
+                break
+            prev_cumulative = cum_val
+
+        if chosen_volume is None:
+
+            raise IndexError(f"Index {idx} out of range in dataset")
+
+        local_index = idx - prev_cumulative
+
+        patch_start = local_index * self.num_feats
+        patch_end = patch_start + self.num_feats
+
+        patches_for_volume = self.samples_tree[chosen_volume]  
+        label_for_volume = self.label_per_volume[chosen_volume]
+
+        total_patches_in_vol = len(patches_for_volume)
+
+        if patch_start >= total_patches_in_vol:
+            patch_start = patch_start - self.num_feats
+            patch_end   = patch_start + self.num_feats
+
+        chosen_patches = []
+
+        while len(chosen_patches) < self.num_feats:
+            current_end = min(patch_end, total_patches_in_vol)
+            chosen_patches.extend(patches_for_volume[patch_start:current_end])
+
+            needed_more = self.num_feats - len(chosen_patches)
+            if needed_more > 0:
+                patch_start = 0
+                patch_end = needed_more
             else:
-                print("Error: Augmentation not supported")
-                return
-   
-        
-        # Convert the label to a tensor
-        label_tensor = torch.tensor(label, dtype=torch.long)
-        
-        return slice_image, label_tensor
+                break
+
+        chosen_patches = chosen_patches[:self.num_feats]
+
+        feature_list = []
+        for patch_data in chosen_patches:
+
+            patch_data = patch_data.astype(np.float32)
+            
+            patch_tensor = torch.tensor(patch_data)
+
+            patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1)
+
+            if self.transform:
+                patch_tensor = self.transform(patch_tensor)
+
+            if self.augmentation and random.random() < 0.5:
+                if self.augmentation == 'elastic':
+                    image_numpy = slice_image.numpy()
+                    image_deformed =  elasticdeform.deform_random_grid(image_numpy, sigma=2, axis=(1, 2),order=1, mode='constant')
+                    slice_image = torch.tensor(image_deformed, dtype=torch.float32)
+                elif self.augmentation == 'tripath':
+                    transforms = {
+                        tio.Lambda(self.rotate_function): 2/3,
+                        tio.Gamma(gamma=(0.8,1.2)): 1/3
+                    }
+                    patch_tensor = patch_tensor.unsqueeze(0)
+                    patch_tensor = tio.OneOf(transforms)(patch_tensor)
+                    patch_tensor = patch_tensor.squeeze(0)
+                else:
+                    print("Error: Augmentation not supported")
+            
+            feature = self.create_feats(patch_tensor)
+
+            feature_list.append(feature)
+
+        aggregator_input = torch.stack(feature_list, dim=0)
+
+
+        label_tensor = torch.tensor(label_for_volume, dtype=torch.long)
+
+        return aggregator_input, label_tensor, chosen_patches
     
 
     def read_json(self,raw_volume_path):

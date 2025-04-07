@@ -38,7 +38,7 @@ def train():
 
     model = model.to(device)    
 
-    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=data_transform,test=True)
+    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None,test=True)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -54,7 +54,7 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
 
-    torch.save(model.state_dict(), 'swin_transformer_2D_organ_classification_slice_parts_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_2D_organ_classification_slice_parts_no_aug.pth')
 
 def eval():
 

@@ -6,6 +6,7 @@ import json
 import fnmatch
 import torchio.transforms as tio    
 import Rotation_transform
+import elasticdeform
 
 class VolumeToPatchesDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False, num_channels = 3, augmentation = None,SwinUnetr = False):
@@ -128,9 +129,12 @@ class VolumeToPatchesDataset(Dataset):
 
         if aug:
             if self.augmentation == 'elastic':
-                patch_tensor = patch_tensor.unsqueeze(0)
-                patch_tensor = tio.RandomElasticDeformation(num_control_points=(9,9,5),max_displacement=(10,10,2))(patch_tensor)
-                patch_tensor = patch_tensor.squeeze(0)
+
+                patch_numpy = patch_tensor.numpy()
+                print(patch_numpy.shape)
+                patch_deformed =  elasticdeform.deform_random_grid(patch_numpy, sigma=2, axis=(0, 1, 2),order=1, mode='constant')
+                patch_tensor = torch.tensor(patch_deformed, dtype=torch.float32)
+
             elif self.augmentation == 'tripath':
                 transforms = {
                     tio.Lambda(self.rotate_function) : 2/3,

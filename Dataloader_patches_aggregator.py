@@ -7,6 +7,7 @@ import fnmatch
 import torchio.transforms as tio    
 import Rotation_transform
 import random
+import elasticdeform
 
 class VolumeToFeaturesDataset(Dataset):
     def __init__(self, root_dir, transform=None, test=False, num_channels=3, augmentation=None, encoder=None, SwinUnetr=False):
@@ -35,7 +36,7 @@ class VolumeToFeaturesDataset(Dataset):
             mask_dir = class_dir + "_tissue_segmentation"
 
             print(class_dir)
-            
+
             if not os.path.isdir(class_dir):
                 print(f"[WARNING] {class_dir} does not exist, skipping.")
                 continue
@@ -62,6 +63,7 @@ class VolumeToFeaturesDataset(Dataset):
                         mask_patch = mask[:, :, (slice_index // 4) : (slice_index // 4) + 8]
 
                         patches = self.extract_patches(volume_patch, mask_patch)
+
                         self.samples_tree[volume_file].extend(patches)
                     
                     random.shuffle(self.samples_tree[volume_file])
@@ -77,6 +79,10 @@ class VolumeToFeaturesDataset(Dataset):
 
                     del volume
 
+
+    def shuffle_samples(self):
+        for volume_file in self.samples_tree:
+            random.shuffle(self.samples_tree[volume_file])
 
     def find_mask_file(self, directory, partial_name):
 
@@ -147,10 +153,7 @@ class VolumeToFeaturesDataset(Dataset):
         max_raw_idx = max(self.max_idx_per_volume.values()) if self.max_idx_per_volume else 0
 
         if idx >= max_raw_idx:
-            aug = True
-            idx = idx - max_raw_idx
-        else:
-            aug = False
+            idx = idx % max_raw_idx
 
         volume_maxes = sorted(self.max_idx_per_volume.items(), key=lambda x: x[1])
 
@@ -204,15 +207,12 @@ class VolumeToFeaturesDataset(Dataset):
             if self.transform:
                 patch_tensor = self.transform(patch_tensor)
 
-            if aug:
+            if self.augmentation and random.random() < 0.5:
+                print("Augmenting")
                 if self.augmentation == 'elastic':
-                    patch_tensor = patch_tensor.unsqueeze(0) 
-                    patch_tensor = tio.RandomElasticDeformation(
-                        num_control_points=(9, 9, 5),
-                        max_displacement=(10, 10, 2)
-                    )(patch_tensor)
-                    patch_tensor = patch_tensor.squeeze(0)
-
+                    patch_numpy = patch_tensor.numpy()
+                    patch_deformed =  elasticdeform.deform_random_grid(patch_numpy, sigma=2, axis=(0, 1, 2),order=1, mode='constant')
+                    patch_tensor = torch.tensor(patch_deformed, dtype=torch.float32)
                 elif self.augmentation == 'tripath':
                     transforms = {
                         tio.Lambda(self.rotate_function): 2/3,
@@ -241,7 +241,7 @@ class VolumeToFeaturesDataset(Dataset):
 
         label_tensor = torch.tensor(label_for_volume, dtype=torch.long)
 
-        return aggregator_input, label_tensor, chosen_patches
+        return aggregator_input, label_tensor
 
     
 

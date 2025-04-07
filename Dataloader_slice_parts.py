@@ -8,6 +8,7 @@ from PIL import Image
 import fnmatch
 import torchio.transforms as tio
 import Rotation_transform
+import elasticdeform
 
 class VolumeToSlicepartsDataset(Dataset):
     def __init__(self, root_dir, transform=None, test = False, augmentation = None):
@@ -135,9 +136,9 @@ class VolumeToSlicepartsDataset(Dataset):
         
         if aug:
             if self.augmentation == 'elastic':
-                slice_image = slice_image.unsqueeze(0)
-                slice_image = tio.RandomElasticDeformation(num_control_points=(5,9,9),max_displacement=(0,10,10))(slice_image)
-                slice_image = slice_image.squeeze(0)
+                    image_numpy = slice_image.numpy()
+                    image_deformed =  elasticdeform.deform_random_grid(image_numpy, sigma=2, axis=(1, 2),order=1, mode='constant')
+                    slice_image = torch.tensor(image_deformed, dtype=torch.float32)
             elif self.augmentation == 'tripath':
                 transforms = {
                     tio.Lambda(self.rotate_function) : 2/3,
@@ -148,10 +149,9 @@ class VolumeToSlicepartsDataset(Dataset):
                 slice_image = slice_image.squeeze(0)
             else:
                 print("Error: Augmentation not supported")
-                return
-   
+                return   
         
-        # Convert the label to a tensor
+
         label_tensor = torch.tensor(label, dtype=torch.long)
         
         return slice_image, label_tensor

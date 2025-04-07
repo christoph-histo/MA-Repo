@@ -3,12 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision import transforms
-from torchvision.models import video
+import torchvision.models as models
 from torch.utils.data import DataLoader
 import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
 import Aggregator_Module
-import Dataloader_patches_aggregator
+import Dataloader_slice_parts_aggregator
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
@@ -17,7 +17,7 @@ data_path = "/storage/Datensätze"
 
 device = torch.device("cuda")
 
-encoder = video.r3d_18(weights=video.R3D_18_Weights.KINETICS400_V1)
+encoder =  models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
 
 encoder.to(device)
 
@@ -37,7 +37,7 @@ model.start_attention(freeze_encoder=False)
 
 batch_size = 8
 
-epochs = 100
+epochs = 50
 
 def train():
 
@@ -47,7 +47,7 @@ def train():
 
     model = model.to(device)    
 
-    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None,num_channels=3, test=False,encoder=encoder)
+    dataset = Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None, test=False ,encoder=encoder)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -85,7 +85,7 @@ def eval():
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset =  Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None,test=True,encoder=encoder)
+    test_dataset =  Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None,test=True,encoder=encoder)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device) 

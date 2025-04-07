@@ -30,7 +30,6 @@ model.fc = nn.Linear(num_ftrs, 3)
 
 batch_size = 64
 
-
 def train():
 
     global model
@@ -39,7 +38,7 @@ def train():
 
     model = model.to(device)
 
-    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=data_transform, test=True)
+    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None, test=False, augmentation="tripath")
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -53,28 +52,29 @@ def train():
 
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
-    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
+    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=10, device="cuda")
 
-    torch.save(model.state_dict(), 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/resnet_2D_organ_classificatio_slide_parts_tripath_aug.pth')
 
 
 def eval():
 
-    model_path = 'resnet_2D_organ_classificatio_slide_parts_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/resnet_2D_organ_classificatio_slide_parts_tripath_aug.pth'
+
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         if k.startswith('module.'):
-            new_state_dict[k[7:]] = v  # remove 'module.' prefix
+            new_state_dict[k[7:]] = v  
         else:
             new_state_dict[k] = v
 
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset = Dataloader_whole_slices.VolumeToSliceDataset(data_path, transform=data_transform,test=True)
+    test_dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None,test=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device) 
@@ -85,4 +85,4 @@ def eval():
         print(f"  Average Loss: {stats['average_loss']:.4f}")
         print(f"  Accuracy: {stats['accuracy']:.4f}")
 
-train()
+eval()
