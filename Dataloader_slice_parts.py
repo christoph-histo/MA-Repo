@@ -114,7 +114,7 @@ class VolumeToSlicepartsDataset(Dataset):
             slice_array, label = self.samples[idx % len(self.samples)]
             aug = True
 
-
+        """
         if slice_array.dtype != np.uint8:
             slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
         
@@ -128,8 +128,14 @@ class VolumeToSlicepartsDataset(Dataset):
         # Normalize the slice_array
         slice_image = (slice_image - slice_image.min()) / (slice_image.max() - slice_image.min())
         # Add one more dimension to the slice_image tensor
-        
+        """
+        slice_array = slice_array.astype(np.float32)
 
+        # Convert the 3D patch to a tensor
+        slice_image = torch.tensor(slice_array, dtype=torch.float32)
+
+        # Replicate the first channel 3 times to mimic RGB
+        slice_image = slice_image.unsqueeze(0).repeat(3, 1, 1)
         # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)

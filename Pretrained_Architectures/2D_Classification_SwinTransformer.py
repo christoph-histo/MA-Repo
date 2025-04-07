@@ -28,7 +28,7 @@ model = models.swin_v2_b(weights=models.Swin_V2_B_Weights.IMAGENET1K_V1)
 num_ftrs = model.head.in_features
 model.head = nn.Linear(num_ftrs, 3)
 
-batch_size = 16
+batch_size = 32
 
 def train():
 
@@ -38,7 +38,7 @@ def train():
 
     model = model.to(device)    
 
-    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None,test=True)
+    dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None,test=False)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -52,7 +52,7 @@ def train():
 
     optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
-    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device="cuda")
+    model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=10, device="cuda")
 
     torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_2D_organ_classification_slice_parts_no_aug.pth')
 
@@ -70,11 +70,10 @@ def eval():
             new_state_dict[k[7:]] = v  # remove 'module.' prefix
         else:
             new_state_dict[k] = v
-
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset = Dataloader_whole_slices.VolumeToSliceDataset(data_path, transform=data_transform, test=True)
+    test_dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(data_path, transform=None, test=True)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader = test_loader, device = device) 
