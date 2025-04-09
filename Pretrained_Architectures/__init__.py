@@ -1,0 +1,6 @@
+from .Classification_2D_ResNet18 import setup as Classification_2D_ResNet18_setup
+from .Classification_2D_SwinTransformer import setup as Classification_2D_SwinTransformer_setup
+from .Classification_3D_ResNet18 import setup as Classification_3D_ResNet18_setup
+from .Classification_3D_SwinTransformer import setup as Classification_3D_SwinTransformer_setup
+from .Classification_Med3D import setup as Classification_Med3D_setup
+from .Classification_SwinUNETR import setup as Classification_SwinUNETR_setup

@@ -76,13 +76,10 @@ class VolumeToSliceDataset(Dataset):
         # Convert to RGB for compatibility with models expecting 3 channels
         slice_image = slice_image.convert("RGB")
 
-        slice_image = transform.PILToTensor()(slice_image)
-        # Normalize the slice_array
-        slice_array = (slice_array - slice_array.min()) / (slice_array.max() - slice_array.min())
-
-        # Apply transformations if specified
         if self.transform:
             slice_image = self.transform(slice_image)
+        else:
+            slice_image = transform.PILToTensor()(slice_image)
 
         if aug:
             if self.augmentation == 'elastic':

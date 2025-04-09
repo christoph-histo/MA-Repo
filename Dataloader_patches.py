@@ -122,7 +122,7 @@ class VolumeToPatchesDataset(Dataset):
         # Convert the 3D patch to a tensor
         patch_tensor = torch.tensor(patch, dtype=torch.float32)
 
-        #patch_tensor = (patch_tensor - patch_tensor.min()) / (patch_tensor.max() - patch_tensor.min())
+
         
         if self.transform:
             patch_tensor = self.transform(patch_tensor)

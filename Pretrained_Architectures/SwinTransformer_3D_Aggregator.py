@@ -3,12 +3,12 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision import transforms
-import torchvision.models as models
+from torchvision.models import video
 from torch.utils.data import DataLoader
 import sys
 sys.path.append('/home/christoph/Dokumente/christoph-MA/MA-Repo')
 import Aggregator_Module
-import Dataloader_slice_parts_aggregator
+import Dataloader_patches_aggregator
 from train import train_model
 from eval import evaluate_model
 from collections import OrderedDict
@@ -17,13 +17,13 @@ data_path = "/storage/Datensätze"
 
 device = torch.device("cuda")
 
-encoder =  models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+encoder = video.swin3d_b(video.Swin3D_B_Weights.KINETICS400_V1)
+
+num_ftrs = encoder.head.out_features
 
 encoder.to(device)
 
-num_ftrs = encoder.fc.out_features
-
-dropout = 0
+dropout = 0.1
 
 decoder_enc = nn.Sequential(
                             nn.Linear(num_ftrs, 128),
@@ -37,7 +37,7 @@ model.start_attention(freeze_encoder=False)
 
 batch_size = 8
 
-epochs = 50
+epochs = 100
 
 def train():
 
@@ -47,7 +47,7 @@ def train():
 
     model = model.to(device)    
 
-    dataset = Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None, test=False ,encoder=encoder)
+    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None,num_channels=3, test=False,encoder=encoder)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -65,13 +65,13 @@ def train():
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=epochs, device="cuda",aggregation=True, scheduler=scheduler)
 
-    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth')
+    torch.save(model.state_dict(), '/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_no_aug.pth')
 
 def eval():
     
     global model
 
-    model_path = '/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_no_aug.pth'
+    model_path = '/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_no_aug.pth'
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
@@ -85,7 +85,7 @@ def eval():
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset =  Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None,test=True,encoder=encoder)
+    test_dataset =  Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None,test=True,encoder=encoder)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)    
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device) 
