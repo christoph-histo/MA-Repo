@@ -15,14 +15,14 @@ from collections import OrderedDict
 import os
 
 def train(data_path, model, transform, save_path, device, augmentation, dataset):
-    batch_size = 32
+    batch_size = 16
 
     model = nn.DataParallel(model)
     model = model.to(device)
 
     if dataset == "slice_parts":
         dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(root_dir=data_path, transform=transform, test=False, augmentation=augmentation)
-        epochs = 25
+        epochs = 10
     elif dataset == "whole_slices":
         dataset = Dataloader_whole_slices.VolumeToSliceDataset(root_dir=data_path, transform=transform, test=False)
         epochs = 10
@@ -47,7 +47,7 @@ def train(data_path, model, transform, save_path, device, augmentation, dataset)
 
 
 def eval(data_path, model, transform, model_path, device, dataset):
-    batch_size = 32
+    batch_size = 16
 
     state_dict = torch.load(model_path)
 

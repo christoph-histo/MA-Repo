@@ -111,7 +111,7 @@ def setup(mode="train", augmentation="no_aug"):
     model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=dropout, out_dim=3, encoder=decoder_enc, encoder_dim=128)
     model.start_attention(freeze_encoder=False)
 
-    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/ResNet_Aggregator_3D_organ_classification_patches_{augmentation}.pth'
+    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/Med3D_Aggregator_3D_organ_classification_patches_{augmentation}.pth'
 
     if augmentation == "no_aug":
         aug = None

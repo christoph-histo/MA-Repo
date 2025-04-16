@@ -23,7 +23,7 @@ def train(data_path,model,transform,save_path,device,augmentation,dataset):
 
     if dataset == "slice_parts":
         dataset = Dataloader_slice_parts.VolumeToSlicepartsDataset(root_dir=data_path, transform=transform, test=False, augmentation=augmentation)
-        epochs = 25
+        epochs = 10
     elif dataset == "whole_slices":
         dataset = Dataloader_whole_slices.VolumeToSliceDataset(root_dir=data_path, transform=transform, test=False)
         epochs = 10

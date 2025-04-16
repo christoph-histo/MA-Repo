@@ -95,8 +95,7 @@ def setup(mode="train", augmentation="no_aug"):
     model.load_state_dict(state_dict=state_dict, strict=False)
 
     # Modify the model's final layers after loading the state dictionary
-    model.swinViT.layers4[0].downsample.reduction = nn.Linear(3072, 3)
-    model.swinViT.layers4[0].downsample.norm = nn.Identity()
+    model.swinViT.layers4[0].downsample.norm = nn.Linear(768, 3)
 
     save_path = f'/home/christoph/Dokumente/christoph-MA/Models/swinUNETR_3D_organ_classification_patches_{augmentation}.pth'
 

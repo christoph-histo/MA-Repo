@@ -4,3 +4,10 @@ from .Classification_3D_ResNet18 import setup as Classification_3D_ResNet18_setu
 from .Classification_3D_SwinTransformer import setup as Classification_3D_SwinTransformer_setup
 from .Classification_Med3D import setup as Classification_Med3D_setup
 from .Classification_SwinUNETR import setup as Classification_SwinUNETR_setup
+
+from .ResNet_2D_Aggregator import setup as ResNet_2D_Aggregator_setup
+from .ResNet_3D_Aggregator import setup as ResNet_3D_Aggregator_setup
+from .SwinTransformer_2D_Aggregator import setup as SwinTransformer_2D_Aggregator_setup
+from .SwinTransformer_3D_Aggregator import setup as SwinTransformer_3D_Aggregator_setup
+from .Med3D_Aggregator import setup as Med3D_Aggregator_setup
+from .SwinUNETR_Aggregator import setup as SwinUNETR_Aggregator_setup

@@ -131,7 +131,6 @@ class VolumeToPatchesDataset(Dataset):
             if self.augmentation == 'elastic':
 
                 patch_numpy = patch_tensor.numpy()
-                print(patch_numpy.shape)
                 patch_deformed =  elasticdeform.deform_random_grid(patch_numpy, sigma=2, axis=(0, 1, 2),order=1, mode='constant')
                 patch_tensor = torch.tensor(patch_deformed, dtype=torch.float32)
 
