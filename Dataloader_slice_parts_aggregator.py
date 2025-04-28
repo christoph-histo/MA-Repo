@@ -207,9 +207,9 @@ class VolumeToSlicepartsDataset(Dataset):
         for patch_data in chosen_patches:
 
             patch_data = patch_data.astype(np.float32)
+           
+            patch_tensor = torch.tensor(patch_data.astype(np.float32))
             
-            patch_tensor = torch.tensor(patch_data)
-
             patch_tensor = patch_tensor.unsqueeze(0).repeat(3, 1, 1)
 
             if self.transform:
@@ -237,10 +237,9 @@ class VolumeToSlicepartsDataset(Dataset):
 
         aggregator_input = torch.stack(feature_list, dim=0)
 
-
         label_tensor = torch.tensor(label_for_volume, dtype=torch.long)
 
-        return aggregator_input, label_tensor, chosen_patches
+        return aggregator_input, label_tensor
     
 
     def read_json(self,raw_volume_path):

@@ -82,10 +82,16 @@ def setup(mode="train", augmentation="no_aug"):
     
     model = video.r2plus1d_18(weights=video.R2Plus1D_18_Weights.KINETICS400_V1)
 
+    for params in model.parameters():
+        params.requires_grad = False
+
     num_ftrs = model.fc.in_features
     model.fc = nn.Linear(num_ftrs, 3)
 
-    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_{augmentation}.pth'
+    for params in model.parameters():
+        print(params.requires_grad)
+
+    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_{augmentation}_only_last_layer.pth'
 
     if augmentation == "no_aug":
         aug = None
@@ -101,5 +107,5 @@ def setup(mode="train", augmentation="no_aug"):
         return
     
 if __name__ == "__main__":
-    #setup(mode="train", augmentation="no_aug")
-    setup(mode="eval", augmentation="no_aug")
+    setup(mode="train", augmentation="no_aug")
+    #setup(mode="eval", augmentation="no_aug")

@@ -75,17 +75,22 @@ def eval(data_path, model, encoder, model_path, device):
             f.write(f"{organ_labels[organ]},{stats['average_loss']:.4f},{stats['accuracy']:.4f}\n")
 
 
-def setup(mode="train", augmentation="no_aug"):
+def setup(mode="train", augmentation="no_aug",encoder="base"):
     data_path = "/storage/Datensätze"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
 
     # Initialize the encoder
-    encoder = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    if encoder == "finetuned":
+        encoder = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+    else:
+        encoder = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
+    num_ftrs = encoder.fc.in_features
+    encoder.fc = nn.Identity() 
     encoder.to(device)
 
-    num_ftrs = encoder.fc.out_features
+    
     dropout = 0.1
 
     # Define the decoder

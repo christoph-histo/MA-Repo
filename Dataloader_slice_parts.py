@@ -114,21 +114,6 @@ class VolumeToSlicepartsDataset(Dataset):
             slice_array, label = self.samples[idx % len(self.samples)]
             aug = True
 
-        """
-        if slice_array.dtype != np.uint8:
-            slice_array = (slice_array / slice_array.max() * 255).astype(np.uint8)
-        
-        slice_image = Image.fromarray(slice_array)
-        
-        # Convert to RGB for compatibility with models expecting 3 channels
-        slice_image = slice_image.convert("RGB")
-        
-        # Convert the PIL image to a tensor
-        slice_image = transform.PILToTensor()(slice_image)
-        # Normalize the slice_array
-        slice_image = (slice_image - slice_image.min()) / (slice_image.max() - slice_image.min())
-        # Add one more dimension to the slice_image tensor
-        """
         slice_array = slice_array.astype(np.float32)
 
         # Convert the 3D patch to a tensor

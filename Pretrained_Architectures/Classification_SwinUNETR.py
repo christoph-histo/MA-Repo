@@ -14,6 +14,34 @@ from train import train_model
 from eval import evaluate_model
 import SwinUNETR
 
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SwinUNETRClassifier(nn.Module):
+    def __init__(self, num_classes=3):
+        super(SwinUNETRClassifier, self).__init__()
+        self.encoder = SwinUNETR.swin_unetr_base(
+            input_size=(128, 128, 32),
+            trainable_layers=["all"],
+            in_channels=1,
+            spatial_dims=3
+        )
+        
+        model_path = "/home/christoph/Dokumente/christoph-MA/research-contributions/swin_unetr.base_5000ep_f48_lr2e-4_pretrained.pt"
+        state_dict = torch.load(model_path, weights_only=False)
+        if 'state_dict' in state_dict:
+            state_dict = state_dict['state_dict']
+        self.encoder.load_state_dict(state_dict=state_dict, strict=False)
+
+        self.classifier = nn.Linear(768, num_classes)  # 768 comes from SwinViT last layer output size
+
+    def forward(self, x):
+        features = self.encoder(x)  # <-- go directly into swinViT part, NOT full encoder
+        logits = self.classifier(features)
+        return logits
+
+
 
 def train(data_path, model, save_path, device, augmentation):
     batch_size = 16
@@ -33,6 +61,7 @@ def train(data_path, model, save_path, device, augmentation):
 
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.AdamW(params=model.parameters(), lr=0.0005, weight_decay=0.0005)
+    #optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
 
     model = train_model(model, criterion, optimizer, dataloaders, dataset_sizes, num_epochs=25, device=device)
 
@@ -79,23 +108,10 @@ def setup(mode="train", augmentation="no_aug"):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
 
-    model_path = "/home/christoph/Dokumente/christoph-MA//research-contributions/swin_unetr.base_5000ep_f48_lr2e-4_pretrained.pt"
+    model = SwinUNETRClassifier(num_classes=3)
 
-    state_dict = torch.load(model_path, weights_only=False)
-
-    if 'state_dict' in state_dict:
-        state_dict = state_dict['state_dict']
-
-    device =  torch.device("cuda:0")
-
-    # Initialize the SwinUNETR model
-    model = SwinUNETR.swin_unetr_base(input_size=(128, 128, 32), trainable_layers=["all"], in_channels=1, spatial_dims=3)
-    
-    # Modify the model's final layers
-    model.load_state_dict(state_dict=state_dict, strict=False)
-
-    # Modify the model's final layers after loading the state dictionary
-    model.swinViT.layers4[0].downsample.norm = nn.Linear(768, 3)
+    for params in model.parameters():
+        print(params.requires_grad)
 
     save_path = f'/home/christoph/Dokumente/christoph-MA/Models/swinUNETR_3D_organ_classification_patches_{augmentation}.pth'
 
@@ -103,6 +119,7 @@ def setup(mode="train", augmentation="no_aug"):
         aug = None
     else:
         aug = augmentation
+
 
     if mode == "train":
         train(data_path=data_path, model=model, save_path=save_path, device=device, augmentation=aug)
@@ -114,5 +131,5 @@ def setup(mode="train", augmentation="no_aug"):
 
 
 if __name__ == "__main__":
-    # setup(mode="train", augmentation="no_aug")
-    setup(mode="eval", augmentation="no_aug")
+    setup(mode="train", augmentation="no_aug")
+    #setup(mode="eval", augmentation="no_aug")

@@ -20,10 +20,11 @@ from eval import evaluate_model
 def train(data_path, model, save_path, device, augmentation):
     batch_size = 32
 
-    model = nn.DataParallel(model)
     model = model.to(device)
 
-    dataset = Dataloader_patches.VolumeToPatchesDataset(root_dir=data_path, transform=None, num_channels=1, test=False, augmentation=augmentation)
+    for name, param in model.named_parameters():
+        print(f"{name} is on {param.device}")
+    dataset = Dataloader_patches.VolumeToPatchesDataset(root_dir=data_path, transform=None, num_channels=1, test=False, augmentation=augmentation,SwinUnetr=True)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -47,17 +48,20 @@ def eval(data_path, model, model_path, device):
     state_dict = torch.load(model_path)
 
     # Remove 'module.' prefix if present
+    """
     new_state_dict = OrderedDict()
     for k, v in state_dict.items():
         if k.startswith('module.'):
             new_state_dict[k[7:]] = v
         else:
             new_state_dict[k] = v
-
+    """
     # Load the modified state dictionary into the model
-    model.load_state_dict(new_state_dict)
+    model.load_state_dict(state_dict)
 
-    dataset = Dataloader_patches.VolumeToPatchesDataset(root_dir=data_path, transform=None, num_channels=1, test=True)
+    model.to(device)
+
+    dataset = Dataloader_patches.VolumeToPatchesDataset(root_dir=data_path, transform=None, num_channels=1, test=True,SwinUnetr=True)
     test_loader = DataLoader(dataset, batch_size=batch_size, shuffle=False)
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device)
@@ -84,7 +88,6 @@ def setup(mode="train", augmentation="no_aug"):
 
     model = resnet.resnet18(sample_input_D=32, sample_input_H=128, sample_input_W=128, num_seg_classes=1)
 
-    # Modify the model's final layers
     model = nn.DataParallel(model)
 
     model_path = "/home/christoph/Dokumente/christoph-MA/MedicalNet/pretrain/resnet_18_23dataset.pth"
@@ -96,6 +99,9 @@ def setup(mode="train", augmentation="no_aug"):
         nn.Flatten(),
         Linear(in_features=512, out_features=3, bias=True)
     )
+
+    for name, param in model.named_parameters():
+        print(f"{name} is on {param.device}")
 
     save_path = f'/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_Med3D_organ_classification_patches_{augmentation}.pth'
 
@@ -113,5 +119,5 @@ def setup(mode="train", augmentation="no_aug"):
         return
 
 if __name__ == "__main__":
-    # setup(mode="train", augmentation="no_aug")
+    #setup(mode="train", augmentation="no_aug")
     setup(mode="eval", augmentation="no_aug") 

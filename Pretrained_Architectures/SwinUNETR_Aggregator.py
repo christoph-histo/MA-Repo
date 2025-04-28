@@ -22,7 +22,7 @@ def train(data_path, model, encoder, save_path, device, augmentation):
     model = nn.DataParallel(model)
     model = model.to(device)
 
-    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=3, test=False, encoder=encoder, augmentation=augmentation)
+    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=1,SwinUnetr=True, test=False, encoder=encoder, augmentation=augmentation)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -57,7 +57,7 @@ def eval(data_path, model, encoder, model_path, device):
     # Load the modified state dictionary into the model
     model.load_state_dict(new_state_dict)
 
-    test_dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=3, test=True, encoder=encoder)
+    test_dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=1,SwinUnetr=True, test=True, encoder=encoder)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device)
@@ -86,10 +86,12 @@ def setup(mode="train", augmentation="no_aug"):
     state_dict = torch.load(encoder_path, weights_only=False)
 
     # Initialize the encoder
-    encoder = SwinUNETR.swin_unetr_base(input_size=(128, 128, 32), trainable_layers=["all"], in_channels=1, spatial_dims=3)
+    encoder = SwinUNETR.swin_unetr_base(input_size=(128, 128, 32), in_channels=1, spatial_dims=3)
     
     # Modify the model's final layers
     encoder.load_state_dict(state_dict=state_dict, strict=False)
+
+    encoder.to(device)
 
     dropout = 0.1
 

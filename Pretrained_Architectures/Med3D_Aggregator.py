@@ -18,13 +18,12 @@ from eval import evaluate_model
 
 
 def train(data_path, model, encoder, save_path, device, augmentation):
-    batch_size = 8
-    epochs = 100
+    batch_size = 4
+    epochs = 50
 
-    model = nn.DataParallel(model)
     model = model.to(device)
 
-    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=3, test=False, encoder=encoder, augmentation=augmentation)
+    dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=1, test=False ,SwinUnetr=True, encoder=encoder, augmentation=augmentation)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -44,22 +43,14 @@ def train(data_path, model, encoder, save_path, device, augmentation):
 
 
 def eval(data_path, model, encoder, model_path, device):
-    batch_size = 8
+    batch_size = 4
 
     state_dict = torch.load(model_path)
 
-    # Remove 'module.' prefix if present
-    new_state_dict = OrderedDict()
-    for k, v in state_dict.items():
-        if k.startswith('module.'):
-            new_state_dict[k[7:]] = v  # remove 'module.' prefix
-        else:
-            new_state_dict[k] = v
-
     # Load the modified state dictionary into the model
-    model.load_state_dict(new_state_dict)
+    model.load_state_dict(state_dict)
 
-    test_dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=3, test=True, encoder=encoder)
+    test_dataset = Dataloader_patches_aggregator.VolumeToFeaturesDataset(data_path, transform=None, num_channels=1,SwinUnetr=True, test=False, encoder=encoder)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
     metrics = evaluate_model(model, test_loader=test_loader, device=device)
@@ -97,6 +88,8 @@ def setup(mode="train", augmentation="no_aug"):
         nn.AdaptiveAvgPool3d(output_size=(1, 1, 1)),
         nn.Flatten()
     )
+
+    encoder.to(device)
 
     dropout = 0.1
 

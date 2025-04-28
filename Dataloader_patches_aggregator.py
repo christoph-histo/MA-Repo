@@ -10,11 +10,13 @@ import random
 import elasticdeform
 
 class VolumeToFeaturesDataset(Dataset):
-    def __init__(self, root_dir, transform=None, test=False, num_channels=3, augmentation=None, encoder=None, SwinUnetr=False):
+    def __init__(self, root_dir, transform=None, test=False, num_channels=3, augmentation=None, encoder=None, SwinUnetr=False, num_feats = 32):
         self.root_dir = root_dir
         self.transform = transform
         self.augmentation = augmentation
         self.max_idx_per_volume = {}
+
+        self.num_feats = num_feats
         
         self.samples_tree = {}
 
@@ -137,9 +139,11 @@ class VolumeToFeaturesDataset(Dataset):
         else:
             return max_idx
     
+
     def rotate_function(self,tensor):
         return Rotation_transform.RandomRotate3D()(tensor)
     
+
     def create_feats(self, tensor):
         with torch.no_grad():
             tensor = tensor.to('cuda')
@@ -201,14 +205,15 @@ class VolumeToFeaturesDataset(Dataset):
 
         feature_list = []
         for patch_data in chosen_patches:
+
             patch_data = patch_data.astype(np.float32)
+
             patch_tensor = torch.tensor(patch_data)
 
             if self.transform:
                 patch_tensor = self.transform(patch_tensor)
 
             if self.augmentation and random.random() < 0.5:
-                print("Augmenting")
                 if self.augmentation == 'elastic':
                     patch_numpy = patch_tensor.numpy()
                     patch_deformed =  elasticdeform.deform_random_grid(patch_numpy, sigma=2, axis=(0, 1, 2),order=1, mode='constant')

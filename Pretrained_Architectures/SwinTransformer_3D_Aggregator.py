@@ -16,8 +16,8 @@ from torchvision.models import video
 
 
 def train(data_path, model, encoder, save_path, device, augmentation):
-    batch_size = 8
-    epochs = 100
+    batch_size = 4
+    epochs = 50
 
     model = nn.DataParallel(model)
     model = model.to(device)
@@ -42,7 +42,7 @@ def train(data_path, model, encoder, save_path, device, augmentation):
 
 
 def eval(data_path, model, encoder, model_path, device):
-    batch_size = 8
+    batch_size = 4
 
     state_dict = torch.load(model_path)
 
@@ -75,18 +75,26 @@ def eval(data_path, model, encoder, model_path, device):
             f.write(f"{organ_labels[organ]},{stats['average_loss']:.4f},{stats['accuracy']:.4f}\n")
 
 
-def setup(mode="train", augmentation="no_aug"):
+def setup(mode="train", augmentation="no_aug",finetuned = False):
     data_path = "/storage/Datensätze"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
 
     # Initialize the encoder
-    encoder = video.swin3d_b(weights=video.Swin3D_B_Weights.KINETICS400_V1)
+
+    if finetuned:
+        encoder = video.swin3d_b(weights=video.Swin3D_B_Weights.KINETICS400_V1)
+        state_dict = torch.load("/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_tripath.pth")
+        encoder.load_state_dict(state_dict, strict=False)
+    else:
+        encoder = video.swin3d_b(weights=video.Swin3D_B_Weights.KINETICS400_V1)
+    num_ftrs = encoder.head.in_features
+    encoder.head = nn.Identity()
     encoder.to(device)
 
-    num_ftrs = encoder.head.out_features
-    dropout = 0.1
+    
+    dropout = 0
 
     # Define the decoder
     decoder_enc = nn.Sequential(
@@ -99,7 +107,7 @@ def setup(mode="train", augmentation="no_aug"):
     model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=dropout, out_dim=3, encoder=decoder_enc, encoder_dim=128)
     model.start_attention(freeze_encoder=False)
 
-    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_{augmentation}.pth'
+    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/SwinTransformer_Aggregator_3D_organ_classification_patches_{augmentation}_{finetuned}.pth'
 
     if augmentation == "no_aug":
         aug = None
@@ -117,5 +125,5 @@ def setup(mode="train", augmentation="no_aug"):
 
 if __name__ == "__main__":
     # Example usage
-    setup(mode="train", augmentation="no_aug")
+    setup(mode="train", augmentation="no_aug",finetuned=False)
     # setup(mode="eval", augmentation="no_aug")
