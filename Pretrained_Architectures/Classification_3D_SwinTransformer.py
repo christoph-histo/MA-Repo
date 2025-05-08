@@ -88,7 +88,7 @@ def setup(mode="train", augmentation="no_aug"):
     for params in model.parameters():
         print(params.requires_grad)
 
-    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_{augmentation}_only_last_layer.pth'
+    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_{augmentation}.pth'
 
     if augmentation == "no_aug":
         aug = None

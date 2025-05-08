@@ -17,7 +17,7 @@ from eval import evaluate_model
 
 def train(data_path, model, encoder, save_path, device, augmentation):
     batch_size = 8
-    epochs = 50
+    epochs = 15
 
     model = nn.DataParallel(model)
     model = model.to(device)
@@ -86,8 +86,7 @@ def setup(mode="train", augmentation="no_aug",encoder="base"):
         encoder = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     else:
         encoder = models.resnet18(weights=models.ResNet18_Weights.DEFAULT)
-    num_ftrs = encoder.fc.in_features
-    encoder.fc = nn.Identity() 
+    num_ftrs = encoder.fc.out_features
     encoder.to(device)
 
     

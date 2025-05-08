@@ -37,14 +37,14 @@ class SwinUNETRClassifier(nn.Module):
         self.classifier = nn.Linear(768, num_classes)  # 768 comes from SwinViT last layer output size
 
     def forward(self, x):
-        features = self.encoder(x)  # <-- go directly into swinViT part, NOT full encoder
+        features = self.encoder(x)  
         logits = self.classifier(features)
         return logits
 
 
 
 def train(data_path, model, save_path, device, augmentation):
-    batch_size = 16
+    batch_size = 32
 
     model = nn.DataParallel(model)
     model = model.to(device)

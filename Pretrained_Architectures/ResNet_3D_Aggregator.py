@@ -15,7 +15,7 @@ from eval import evaluate_model
 
 
 def train(data_path, model, encoder, save_path, device, augmentation):
-    batch_size = 4
+    batch_size = 8
     epochs = 50
 
     model = nn.DataParallel(model)
@@ -32,6 +32,7 @@ def train(data_path, model, encoder, save_path, device, augmentation):
     dataloaders = {'train': train_loader, 'val': val_loader}
 
     criterion = nn.CrossEntropyLoss()
+    #optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9)
     optimizer = optim.AdamW(model.parameters(), lr=0.0002, weight_decay=0.0005)
     scheduler = CosineAnnealingLR(optimizer, T_max=epochs, eta_min=0)
 
@@ -41,7 +42,7 @@ def train(data_path, model, encoder, save_path, device, augmentation):
 
 
 def eval(data_path, model, encoder, model_path, device):
-    batch_size = 4
+    batch_size = 8
 
     state_dict = torch.load(model_path)
 
@@ -83,16 +84,19 @@ def setup(mode="train", augmentation="no_aug",finetuned=False):
     # Initialize the encoder
     if finetuned:
         encoder = video.r2plus1d_18(weights=video.R2Plus1D_18_Weights.KINETICS400_V1)
-        state_dict = torch.load("/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_elastic.pth")
+        state_dict = torch.load("/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_organ_classification_patches_tripath.pth")
+        encoder.fc = nn.Linear(encoder.fc.in_features, 3)
+        encoder = nn.DataParallel(encoder)
         encoder.load_state_dict(state_dict, strict=False)
+        num_ftrs = encoder.module.fc.in_features 
+        encoder.module.fc = nn.Identity()  
     else:
         encoder = video.r2plus1d_18(weights=video.R2Plus1D_18_Weights.KINETICS400_V1)
-    num_ftrs = encoder.fc.in_features
-    encoder.fc = nn.Identity() 
+        num_ftrs = encoder.fc.out_features 
     encoder.to(device)
 
     
-    dropout = 0 
+    dropout = 0.1
 
     # Define the decoder
     decoder_enc = nn.Sequential(
@@ -126,5 +130,5 @@ def setup(mode="train", augmentation="no_aug",finetuned=False):
 
 if __name__ == "__main__":
     # Example usage
-    setup(mode="train", augmentation="no_aug", finetuned=False)
+    setup(mode="train", augmentation="no_aug", finetuned=True)
     # setup(mode="eval", augmentation="no_aug")

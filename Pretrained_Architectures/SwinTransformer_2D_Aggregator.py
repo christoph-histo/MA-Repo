@@ -17,12 +17,12 @@ from torchvision.models import swin_v2_b, Swin_V2_B_Weights
 
 def train(data_path, model, encoder, save_path, device, augmentation):
     batch_size = 4
-    epochs = 50
+    epochs = 15
 
     model = nn.DataParallel(model)
     model = model.to(device)
 
-    dataset = Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None, test=True, encoder=encoder, augmentation=augmentation)
+    dataset = Dataloader_slice_parts_aggregator.VolumeToSlicepartsDataset(data_path, transform=None, test=False, encoder=encoder, augmentation=augmentation)
 
     train_set, val_set = torch.utils.data.random_split(dataset, [int(0.9 * len(dataset)), len(dataset) - int(0.9 * len(dataset))])
 
@@ -83,8 +83,9 @@ def setup(mode="train", augmentation="no_aug"):
 
     # Initialize the encoder
     encoder = swin_v2_b(weights=Swin_V2_B_Weights.IMAGENET1K_V1)
-    num_ftrs = encoder.head.in_features
-    encoder.head = nn.Identity()
+    num_ftrs = encoder.head.out_features
+
+    encoder = nn.DataParallel(encoder)
     encoder.to(device)
 
     

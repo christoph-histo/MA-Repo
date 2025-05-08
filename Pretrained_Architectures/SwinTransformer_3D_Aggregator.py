@@ -16,7 +16,7 @@ from torchvision.models import video
 
 
 def train(data_path, model, encoder, save_path, device, augmentation):
-    batch_size = 4
+    batch_size = 8
     epochs = 50
 
     model = nn.DataParallel(model)
@@ -42,7 +42,7 @@ def train(data_path, model, encoder, save_path, device, augmentation):
 
 
 def eval(data_path, model, encoder, model_path, device):
-    batch_size = 4
+    batch_size = 8
 
     state_dict = torch.load(model_path)
 
@@ -87,14 +87,14 @@ def setup(mode="train", augmentation="no_aug",finetuned = False):
         encoder = video.swin3d_b(weights=video.Swin3D_B_Weights.KINETICS400_V1)
         state_dict = torch.load("/home/christoph/Dokumente/christoph-MA/Models/swin_transformer_3D_organ_classification_patches_tripath.pth")
         encoder.load_state_dict(state_dict, strict=False)
+        encoder.head = nn.Identity()
     else:
         encoder = video.swin3d_b(weights=video.Swin3D_B_Weights.KINETICS400_V1)
-    num_ftrs = encoder.head.in_features
-    encoder.head = nn.Identity()
+    num_ftrs = encoder.head.out_features
     encoder.to(device)
 
     
-    dropout = 0
+    dropout = 0.1
 
     # Define the decoder
     decoder_enc = nn.Sequential(

@@ -68,21 +68,23 @@ def eval(data_path, model, encoder, model_path, device):
             f.write(f"{organ_labels[organ]},{stats['average_loss']:.4f},{stats['accuracy']:.4f}\n")
 
 
-def setup(mode="train", augmentation="no_aug"):
+def setup(mode="train", augmentation="no_aug",finetuned=False):
     data_path = "/storage/Datensätze"
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("device: ", device)
 
     # Initialize the encoder
-    encoder = resnet.resnet18(sample_input_D=32, sample_input_H=128, sample_input_W=128, num_seg_classes=1)
+    if finetuned:
+        encoder = resnet.resnet18(sample_input_D=32, sample_input_H=128, sample_input_W=128, num_seg_classes=1)
+        state_dict = torch.load("/home/christoph/Dokumente/christoph-MA/Models/resnet_3D_Med3D_organ_classification_patches_no_aug.pth")
+        encoder = nn.DataParallel(encoder)
+        encoder.load_state_dict(state_dict, strict=False)
+    else:
+        encoder = resnet.resnet18(sample_input_D=32, sample_input_H=128, sample_input_W=128, num_seg_classes=1)
+        model_path = "/home/christoph/Dokumente/christoph-MA/MedicalNet/pretrain/resnet_18_23dataset.pth"
+        encoder.load_state_dict(torch.load(model_path),strict=False)
 
-    # Modify the model's final layers
-    encoder = nn.DataParallel(encoder)
-
-    model_path = "/home/christoph/Dokumente/christoph-MA/MedicalNet/pretrain/resnet_18_23dataset.pth"
-
-    encoder.load_state_dict(torch.load(model_path),strict=False)
 
     encoder.module.conv_seg = nn.Sequential(
         nn.AdaptiveAvgPool3d(output_size=(1, 1, 1)),
@@ -104,7 +106,7 @@ def setup(mode="train", augmentation="no_aug"):
     model = Aggregator_Module.AttnMeanPoolMIL(gated=True, dropout=dropout, out_dim=3, encoder=decoder_enc, encoder_dim=128)
     model.start_attention(freeze_encoder=False)
 
-    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/Med3D_Aggregator_3D_organ_classification_patches_{augmentation}.pth'
+    save_path = f'/home/christoph/Dokumente/christoph-MA/Models/Med3D_Aggregator_3D_organ_classification_patches_{augmentation}_{finetuned}.pth'
 
     if augmentation == "no_aug":
         aug = None
@@ -122,5 +124,5 @@ def setup(mode="train", augmentation="no_aug"):
 
 if __name__ == "__main__":
     # Example usage
-    setup(mode="train", augmentation="no_aug")
+    setup(mode="train", augmentation="no_aug",finetuned=True)
     # setup(mode="eval", augmentation="no_aug")
